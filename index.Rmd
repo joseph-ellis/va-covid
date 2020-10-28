@@ -1,0 +1,29 @@
+---
+title: "COVID-19 in Virginia"
+author: "Joseph Ellis - Ellis Analytics"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: cosmo
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(config)
+library(flexdashboard)
+library(lubridate)
+library(RSocrata)
+library(scales)
+library(shiny)
+library(shinyEffects)
+library(shinyjs)
+library(shinythemes)
+library(shinyWidgets)
+library(tidyverse)
+
+source("R/global.R")
+
+load("data/CovidData.RData")
+
+```
