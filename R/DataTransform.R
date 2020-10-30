@@ -1,6 +1,7 @@
 # load necessary packages
 library(tidyverse)
 library(lubridate)
+library(zoo)
 
 # load VDOH data object
 source("R/DataAccess.R")
@@ -84,7 +85,7 @@ SummarizeMetrics <- function(.data) {
         .cols = where(is.numeric),
         .fns = ~ round(
           .x,
-          4
+          digits = 4
         )
       )
     )
@@ -112,12 +113,46 @@ healthDistrictCurrentMetricSummary <- allLocalMetricsByDate %>%
 localityCurrentMetricSummary <- allLocalMetricsByDate %>%
   filter(Date == max(Date))
 
-# objects to save
-toSave <- c("stateCurrentMetricSummary",
-            "healthPlanningRegionCurrentMetricSummary",
-            "healthDistrictCurrentMetricSummary",
-            "localityCurrentMetricSummary"
+# summary of metrics for entire state for all dates
+stateMetricSummaryByDate <- allLocalMetricsByDate %>%
+  group_by(Date) %>%
+  SummarizeMetrics()
+
+# summary of daily new metrics with moving averages
+stateNewMetricSummaryByDate <- stateMetricSummaryByDate %>%
+  select(Date, TotalCases, Hospitalizations, Deaths) %>%
+  mutate(
+    NewCases = TotalCases - lag(TotalCases, default = 0),
+    NewHospitalizations = Hospitalizations - lag(Hospitalizations, default = 0),
+    NewDeaths = Deaths - lag(Deaths, default = 0)
+  ) %>%
+  select(Date, NewCases, NewHospitalizations, NewDeaths) %>%
+  mutate(
+    NewCases_7MA = round(
+      rollmean(NewCases, k = 7, fill = NA),
+      digits = 2
+    ),
+    NewHospitalizations_7MA = round(
+      rollmean(NewHospitalizations, k = 7, fill = NA),
+      digits = 2
+    ),
+    NewDeaths_7MA = round(
+      rollmean(NewDeaths, k = 7, fill = NA),
+      digits = 2
+    )
   )
 
-# write RData object with current data
-save(list = toSave, file = "data/CovidData.RData")
+# objects to save
+toSave <- list(
+  SCMS = stateCurrentMetricSummary,
+  HPRCMS = healthPlanningRegionCurrentMetricSummary,
+  HDCMS = healthDistrictCurrentMetricSummary,
+  LCMS = localityCurrentMetricSummary,
+  SMSBD = stateMetricSummaryByDate,
+  SNMSBD = stateNewMetricSummaryByDate
+)
+
+saveRDS(
+  object = toSave,
+  file = "data/covid.rds"
+)
