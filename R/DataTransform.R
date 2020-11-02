@@ -97,7 +97,8 @@ MovingAverage7Day <- function(.field) {
       .field,
       k = 7,
       fill = NA
-    )
+    ),
+    digits = 2
   )
 }
 
