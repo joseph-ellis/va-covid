@@ -12,12 +12,24 @@ runtime: shiny
 
 <!-- TODO - Move any style written here to its own CSS file -->
 <style>
+  .chart-title {
+    color: #2196F3;
+  }
+  
+  .chart-wrapper {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3)
+  }
+
   .panel {
     margin-top: 10px;
   }
   
   .panel-title {
     font-size: 18px;
+  }
+  
+  .value-box {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3)
   }
 </style>
 
@@ -46,20 +58,18 @@ source("R/global.R")
 
 # load necessary components
 source("components/highChartSingleLineDate.R")
-source("components/highChartColumnLineDate.R")
+source("components/highChartMultiLineDate.R")
+source("components/highChartAreaLineDate.R")
+source("components/highChartMultiAreaLineDate.R")
 
 # load all data
 covid <- readRDS("data/covid.rds")
 
+rv <- reactiveValues()
+
 ```
 
-
-State Metric Summary {data-navmenu="State"}
-===============================================================================
-
-Sidebar {.sidebar}
--------------------------------------------------------------------------------
-```{r global-sidebar}
+```{r globals}
 
 # metrics showing counted values
 metricsCount <- c(
@@ -84,12 +94,21 @@ metricsNew <- c(
   "New Deaths"
 )
 
+```
+
+State Metric Summary {data-navmenu="State"}
+===============================================================================
+
+Sidebar {.sidebar}
+-------------------------------------------------------------------------------
+```{r sidebar_state-summary}
+
 # user input panel
 panel(
   heading = "User Inputs",
   status = "primary",
   prettyRadioButtons(
-    inputId = "stateChartType",
+    inputId = "stateSummaryChartType",
     label = "What to plot...", 
     choices = c(
       "Cumulative Totals",
@@ -100,7 +119,7 @@ panel(
     status = "primary"
   ),
   pickerInput(
-    inputId = "metric",
+    inputId = "stateSummaryMetric",
     label = "Choose a metric...", 
     choices = list(
       Counts = metricsCount,
@@ -111,9 +130,9 @@ panel(
 )
 
 # change metrics in the dropdown menu based on selected chart type
-observeEvent(input$stateChartType, {
+observeEvent(input$stateSummaryChartType, {
   metricChoices <- switch(
-    input$stateChartType,
+    input$stateSummaryChartType,
     "Cumulative Totals" = list(
       Counts = metricsCount,
       Rates = metricsRate
@@ -123,7 +142,7 @@ observeEvent(input$stateChartType, {
   
   updatePickerInput(
     session = session,
-    inputId = "metric",
+    inputId = "stateSummaryMetric",
     choices = metricChoices
   )
 })
@@ -133,11 +152,12 @@ observeEvent(input$stateChartType, {
 Row
 -------------------------------------------------------------------------------
 ### Total Cases
-```{r value-box_total-cases}
+```{r value-box_state_total-cases}
 
 # display total cases
 valueBox(
   value = format(covid$SCMS$TotalCases, big.mark = ","),
+  caption = "Total Cases in Virginia",
   icon = "fa-thermometer-three-quarters",
   color = "danger"
 )
@@ -145,11 +165,12 @@ valueBox(
 ```
 
 ### Hospitalizations
-```{r value-box_hospitalizations}
+```{r value-box_state_hospitalizations}
 
 # display total hospitalizations
 valueBox(
   value = format(covid$SCMS$Hospitalizations, big.mark = ","),
+  caption = "Total Hospitalizations in Virginia",
   icon = "fa-hospital",
   color = "danger"
 )
@@ -157,11 +178,12 @@ valueBox(
 ```
 
 ### Deaths
-```{r value-box_deaths}
+```{r value-box_state_deaths}
 
 # display total deaths
 valueBox(
   value = format(covid$SCMS$Deaths, big.mark = ","),
+  caption = "Total Deaths in Virginia",
   icon = "fa-ambulance",
   color = "danger"
 )
@@ -171,7 +193,7 @@ valueBox(
 Row
 -------------------------------------------------------------------------------
 ### Cases per 100K
-```{r value-box_cases-100k}
+```{r value-box_state_cases-100k}
 
 # display cases per 100K 
 valueBox(
@@ -179,6 +201,7 @@ valueBox(
     round(covid$SCMS$CasesPer100K),
     big.mark = ","
   ),
+  caption = "Cases per 100K People in Virginia",
   icon = "fa-users",
   color = "warning"
 )
@@ -186,11 +209,12 @@ valueBox(
 ```
 
 ### Hospitalizations Rate
-```{r value-box_hospital_rate}
+```{r value-box_state_hospital_rate}
 
 # display hospitalization rate
 valueBox(
   value = percent(covid$SCMS$PercentCasesHospitalized, accuracy = 0.1),
+  caption = "Hospitalization Rate in Virginia",
   icon = "fa-hospital",
   color = "warning"
 )
@@ -198,11 +222,12 @@ valueBox(
 ```
 
 ### Mortality Rate
-```{r value-box_mortality_rate}
+```{r value-box_state_mortality_rate}
 
 # display mortality rate
 valueBox(
   value = percent(covid$SCMS$MortalityRate, accuracy = 0.1),
+  caption = "Mortality Rate in Virginia",
   icon = "fa-ambulance",
   color = "warning"
 )
@@ -212,12 +237,13 @@ valueBox(
 Row
 -------------------------------------------------------------------------------
 
-### `r renderUI("<h5>State Summary Metrics</h5>" %>% lapply(htmltools::HTML))`
-```{r hc_state}
+### `r renderUI(HTML("<h5>State Summary Metrics</h5>"))`
+```{r hc_state_summary}
 
-stateChartData <- eventReactive(input$metric, {
+# reactive object for chart data
+stateSummaryChartData <- eventReactive(input$stateSummaryMetric, {
   chosenMetric <- switch(
-    input$metric,
+    input$stateSummaryMetric,
     "Total Cases" = "TotalCases",
     "Total Hospitalizations" = "Hospitalizations",
     "Total Deaths" = "Deaths",
@@ -232,14 +258,14 @@ stateChartData <- eventReactive(input$metric, {
   )
   
   chosenAverage <- switch(
-    input$metric,
+    input$stateSummaryMetric,
     "New Cases" = "NewCases_7MA",
     "New Hospitalizations" = "NewHospitalizations_7MA",
     "New Deaths" = "NewDeaths_7MA" 
   )
   
   output <- switch(
-    input$stateChartType,
+    input$stateSummaryChartType,
     "Cumulative Totals" = covid$SMSBD %>% 
       select("plotX" = Date, "plotY" = all_of(chosenMetric)),
     "Daily New Values" = covid$SNMSBD %>% 
@@ -247,32 +273,457 @@ stateChartData <- eventReactive(input$metric, {
   )
 })
 
-yAxisTitle <- eventReactive(input$metric, {
-  output <- input$metric
+# reactive object for the y-axis title
+summaryYAxisTitle <- eventReactive(input$stateSummaryMetric, {
+  output <- input$stateSummaryMetric
 })
 
-stateSummaryPlotter <- eventReactive(input$metric, {
+# reactive object to plot chart type based on selection
+stateSummaryPlotter <- eventReactive(input$stateSummaryMetric, {
   switch(
-    input$stateChartType,
-    "Cumulative Totals" = HighChartSingleLineDate(stateChartData, yAxisTitle) %>%
-      StyleSingleLineDate(yAxisTitle),
-    "Daily New Values" = HighChartColumnLineDate(stateChartData, yAxisTitle) %>%
-      StyleColumnLineDate(yAxisTitle)
+    input$stateSummaryChartType,
+    "Cumulative Totals" = HighChartSingleLineDate(stateSummaryChartData, summaryYAxisTitle) %>%
+      StyleSingleLineDate(summaryYAxisTitle),
+    "Daily New Values" = HighChartAreaLineDate(stateSummaryChartData, summaryYAxisTitle) %>%
+      StyleAreaLineDate(summaryYAxisTitle)
   )
 })
 
+# render the chart
 renderHighchart({
   stateSummaryPlotter()
 })
 
 ```
 
-State Metrics by Subgroups {data-navmenu="State"}
+Health Planning Region Summary {data-navmenu="Health Planning Regions"}
 ===============================================================================
+Sidebar {.sidebar}
+-------------------------------------------------------------------------------
+```{r sidebar_hpr-summary}
 
-Health District Metrics
-===============================================================================
+# enable use of shinyjs
+useShinyjs(rmd = TRUE)
 
+hpr <- covid$HPRCMS %>%
+  distinct(HealthPlanningRegion)
+  
+
+hprAll <- hpr %>%
+  add_row(
+    HealthPlanningRegion = "All Regions",
+    .before = 1
+  )
+
+hprNone <- hpr %>%
+  add_row(
+    HealthPlanningRegion = "None",
+    .before = 1
+  )
+
+rv$hprComparison <- 0
+
+# user input panel
+panel(
+  heading = "User Inputs",
+  status = "primary",
+  prettyRadioButtons(
+    inputId = "hprSummaryChartType",
+    label = "What to plot...", 
+    choices = c(
+      "Cumulative Totals",
+      "Daily New Values"
+    ),
+    icon = icon("check"), 
+    bigger = TRUE,
+    status = "primary"
+  ),
+  pickerInput(
+    inputId = "hprSummaryMetric",
+    label = "Choose a metric...", 
+    choices = list(
+      Counts = metricsCount,
+      Rates = metricsRate
+    ),
+    selected = "Total Cases"
+  ),
+  pickerInput(
+    inputId = "hpr",
+    label = "Choose a planning region...", 
+    choices = hpr
+  ),
+  hidden(
+    pickerInput(
+      inputId = "hprCompare",
+      label = "Planning region to compare...",
+      choices = hprNone
+    )
+  )
+)
+
+# change metrics in the dropdown menu based on selected chart type
+observeEvent(input$hprSummaryChartType, {
+  metricChoices <- switch(
+    input$hprSummaryChartType,
+    "Cumulative Totals" = list(
+      Counts = metricsCount,
+      Rates = metricsRate
+    ),
+    "Daily New Values" = metricsNew
+  )
+  
+  updatePickerInput(
+    session = session,
+    inputId = "hprSummaryMetric",
+    choices = metricChoices
+  )
+  
+  hprChoices <- switch(
+    input$hprSummaryChartType,
+    "Cumulative Totals" = hprAll,
+    "Daily New Values" = hpr
+  )
+  
+  updatePickerInput(
+    session = session,
+    inputId = "hpr",
+    choices = hprChoices
+  )
+  
+  if (input$hprSummaryChartType == "Cumulative Totals") {
+    rv$hprComparison <- 0
+  }
+  else {
+    rv$hprComparison <- 1
+  }
+})
+
+observeEvent(rv$hprComparison, {
+  if (rv$hprComparison == 0) {
+    hide(selector = "select[id='hprCompare']")
+    
+    updatePickerInput(
+      inputId = "hprCompare",
+      session = session,
+      selected = "None"
+    )
+  }
+  else {
+    show(selector = "select[id='hprCompare']")
+  }
+})
+
+chosenHPR <- eventReactive(input$hpr, {
+  output <- input$hpr
+})
+
+chosenHPRData <- reactive({
+  covid$HPRCMS %>%
+    filter(HealthPlanningRegion == chosenHPR())
+})
+
+chosenComparison <- eventReactive(input$hprComparison, {
+  output <- input$hprComparison
+})
+
+chosenComparisonData <- reactive({
+  covid$HPRCMS %>%
+    filter(HealthPlanningRegion == chosenComparison())
+})
+
+hprData <- eventReactive(c(input$hpr, input$hprCompare), {
+  if (input$hprCompare == "None") {
+    chosenHPRData()
+  }
+  else {
+    rbind(chosenHPRData(), chosenComparisonData())
+  }
+})
+
+districtsIncluded <- eventReactive(input$hpr, {
+  covid$HDCMS %>%
+    filter(HealthPlanningRegion == chosenHPR()) %>%
+    distinct(HealthDistrict) %>%
+    as.vector()
+})
+
+# panel(
+#   heading = "Planning Districts",
+#   status = "warning",
+#   renderText({
+#     paste("The", input$hpr, "health planning region includes the following districts:")
+#   }),
+#   renderTable({
+#     districtsIncluded()
+#   })
+# )
+
+```
+
+Row
+-------------------------------------------------------------------------------
+### Total Cases
+```{r value-box_hpr_total-cases}
+
+# display total cases
+renderValueBox({
+  if (input$hpr == "All Regions") {
+    valueBox(
+      value = format(covid$SCMS$TotalCases, big.mark = ","),
+      caption = "Total Cases in Virginia",
+      icon = "fa-thermometer-three-quarters",
+      color = "danger"
+    )
+  }
+  else {
+    valueBox(
+      value = format(chosenHPRData()$TotalCases, big.mark = ","),
+      caption = paste0("Total Cases in the ", chosenHPR(), " Health Planning Region"),
+      icon = "fa-thermometer-three-quarters",
+      color = "danger"
+    )
+  }
+})
+
+```
+
+### Hospitalizations
+```{r value-box_hpr_hospitalizations}
+
+# display total hospitalizations
+renderValueBox({
+  if (input$hpr == "All Regions") {
+    valueBox(
+      value = format(covid$SCMS$Hospitalizations, big.mark = ","),
+      caption = "Total Hospitalizations in Virginia",
+      icon = "fa-hospital",
+      color = "danger"
+    )
+  }
+  else {
+    valueBox(
+      value = format(chosenHPRData()$Hospitalizations, big.mark = ","),
+      caption = paste0("Total Hospitalizations in the ", chosenHPR(), " Health Planning Region"),
+      icon = "fa-hospital",
+      color = "danger"
+    )
+  }
+})
+
+```
+
+### Deaths
+```{r value-box_hpr_deaths}
+
+# display total deaths
+renderValueBox({
+  if (input$hpr == "All Regions") {
+    valueBox(
+      value = format(covid$SCMS$Deaths, big.mark = ","),
+      caption = "Total Deaths in Virginia",
+      icon = "fa-ambulance",
+      color = "danger"
+    )
+  }
+  else {
+    valueBox(
+      value = format(chosenHPRData()$Deaths, big.mark = ","),
+      caption = paste0("Total Deaths in the ", chosenHPR(), " Health Planning Region"),
+      icon = "fa-ambulance",
+      color = "danger"
+    )
+  }
+})
+
+```
+
+Row
+-------------------------------------------------------------------------------
+### Cases per 100K
+```{r value-box_hpr_cases-100k}
+
+# display cases per 100K
+renderValueBox({
+  if (input$hpr == "All Regions") {
+    valueBox(
+      value = format(
+        round(covid$SCMS$CasesPer100K),
+        big.mark = ","
+      ),
+      caption = "Cases per 100K People in Virginia",
+      icon = "fa-users",
+      color = "warning"
+    )
+  }
+  else {
+    valueBox(
+      value = format(
+        round(chosenHPRData()$CasesPer100K),
+        big.mark = ","
+      ),
+      caption = paste0("Cases per 100K People in the ", chosenHPR(), " Health Planning Region"),
+      icon = "fa-users",
+      color = "warning"
+    )
+  }
+})
+
+```
+
+### Hospitalizations Rate
+```{r value-box_hpr_hospital_rate}
+
+# display hospitalization rate
+renderValueBox({
+  if (input$hpr == "All Regions") {
+    valueBox(
+      value = percent(covid$SCMS$PercentCasesHospitalized, accuracy = 0.1),
+      caption = "Hospitalization Rate in Virginia",
+      icon = "fa-hospital",
+      color = "warning"
+    )
+  }
+  else {
+    valueBox(
+      value = percent(chosenHPRData()$PercentCasesHospitalized, accuracy = 0.1),
+      caption = paste0("Hospitalization Rate in the ", chosenHPR(), " Health Planning Region"),
+      icon = "fa-hospital",
+      color = "warning"
+    )
+  }
+})
+
+```
+
+### Mortality Rate
+```{r value-box_hpr_mortality_rate}
+
+# display mortality rate
+renderValueBox({
+  if (input$hpr == "All Regions") {
+    valueBox(
+      value = percent(covid$SCMS$MortalityRate, accuracy = 0.1),
+      caption = "Mortality Rate in Virginia",
+      icon = "fa-ambulance",
+      color = "warning"
+    )
+  }
+  else {
+    valueBox(
+      value = percent(chosenHPRData()$MortalityRate, accuracy = 0.1),
+      caption = paste0("Mortality rate in the ", chosenHPR(), " Health Planning Region"),
+      icon = "fa-ambulance",
+      color = "warning"
+    )
+  }
+})
+
+```
+
+Row
+-------------------------------------------------------------------------------
+
+### `r renderUI(HTML("<h5> Health Planning Region Summary Metrics"))`
+```{r hc_hpr_summary}
+
+observeEvent(input$hpr, {
+  switch(
+    input$hprSummaryChartType,
+    "Cumulative Totals" = updatePickerInput(
+      session = session,
+      inputId = "hprSummaryMetric",
+      selected = "Total Cases"
+    ),
+    "Daily New Values" = updatePickerInput(
+      session = session,
+      inputId = "hprSummaryMetric",
+      selected = "New Cases"
+    )
+  )
+})
+
+# reactive object for chart data
+hprSummaryChartData <- eventReactive(c(input$hpr, input$hprSummaryMetric, input$hprCompare), {
+  chosenMetric <- switch(
+    input$hprSummaryMetric,
+    "Total Cases" = "TotalCases",
+    "Total Hospitalizations" = "Hospitalizations",
+    "Total Deaths" = "Deaths",
+    "Cases per 100K" = "CasesPer100K",
+    "Hospitalization Rate" = "PercentCasesHospitalized",
+    "Hospitalization per 100K" = "HospitalizationsPer100K",
+    "Mortality Rate" = "MortalityRate",
+    "Deaths per 100K" = "DeathsPer100K",
+    "New Cases" = "NewCases",
+    "New Hospitalizations" = "NewHospitalizations",
+    "New Deaths" = "NewDeaths"
+  )
+
+  chosenAverage <- switch(
+    input$hprSummaryMetric,
+    "New Cases" = "NewCases_7MA",
+    "New Hospitalizations" = "NewHospitalizations_7MA",
+    "New Deaths" = "NewDeaths_7MA"
+  )
+
+  output <- switch(
+    input$hprSummaryChartType,
+    "Cumulative Totals" = if (input$hpr == "All Regions") {
+      covid$HPRMSBD %>%
+      select("plotX" = Date, "plotGroup" = HealthPlanningRegion, "plotY" = all_of(chosenMetric))
+    }
+    else {
+      covid$HPRMSBD %>%
+      filter(HealthPlanningRegion == chosenHPR()) %>%
+      select("plotX" = Date, "plotY" = all_of(chosenMetric))
+    },
+    "Daily New Values" = if (input$hprCompare == "None") {
+      covid$HPRNMSBD %>%
+        filter(HealthPlanningRegion == chosenHPR()) %>%
+        select("plotX" = Date, "plotYC" = all_of(chosenMetric), "plotYL" = all_of(chosenAverage))
+    }
+    else {
+      covid$HPRNMSBD %>%
+        filter(HealthPlanningRegion %in% c(input$hpr, input$hprCompare)) %>%
+        select("plotX" = Date, "plotGroup" = HealthPlanningRegion, "plotYC" = all_of(chosenMetric), "plotYL" = all_of(chosenAverage))
+    }
+  )
+})
+
+# reactive object for the y-axis title
+hprSummaryYAxisTitle <- eventReactive(input$hprSummaryMetric, {
+  output <- input$hprSummaryMetric
+})
+
+# reactive object to plot chart type based on selection
+hprSummaryPlotter <- eventReactive(c(input$hpr, input$hprSummaryMetric, input$hprCompare), {
+  switch(
+    input$hprSummaryChartType,
+    "Cumulative Totals" = if (input$hpr == "All Regions") {
+      HighChartMultiLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
+      StyleMultiLineDate(hprSummaryYAxisTitle)
+    }
+    else {
+      HighChartSingleLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
+      StyleSingleLineDate(hprSummaryYAxisTitle)
+    },
+    "Daily New Values" = if (input$hprCompare == "None") {
+      HighChartAreaLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
+      StyleAreaLineDate(hprSummaryYAxisTitle)
+    }
+    else {
+      HighChartMultiAreaLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
+      StyleMultiAreaLineDate(hprSummaryYAxisTitle)
+    }
+  )
+})
+
+# render the chart
+renderHighchart({
+  hprSummaryPlotter()
+})
+
+```
 
 Locality Metrics
 ===============================================================================

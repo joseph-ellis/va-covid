@@ -1,11 +1,11 @@
 
 # basic cloumn-line combo chart
-HighChartColumnLineDate <- function(.data, .yTitle) {
+HighChartAreaLineDate <- function(.data, .yTitle) {
   highchart() %>%
     hc_add_series(
       name = .yTitle(),
       data = .data(),
-      type = "column",
+      type = "area",
       hcaes(
         x = as.Date(plotX),
         y = plotYC
@@ -23,7 +23,7 @@ HighChartColumnLineDate <- function(.data, .yTitle) {
 }
 
 # application specific styling
-StyleColumnLineDate <- function(.hc, .yTitle) {
+StyleAreaLineDate <- function(.hc, .yTitle) {
 
   # styling
   .hc %>%
@@ -45,12 +45,21 @@ StyleColumnLineDate <- function(.hc, .yTitle) {
       labels = list(
         format = "{value:,.0f}"
       ),
+      min = 0,
+      tickAmount = 5,
       crosshair = TRUE
     ) %>%
     hc_legend(
       enabled = FALSE
     ) %>%
     hc_plotOptions(
+      area = list(
+        fillOpacity = 0.5,
+        marker = list(
+          enabled = FALSE
+        ),
+        shadow = TRUE
+      ),
       line = list(
         color = "#21445F",
         lineWidth = 4,

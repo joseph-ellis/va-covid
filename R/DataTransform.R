@@ -91,32 +91,18 @@ SummarizeMetrics <- function(.data) {
     )
 }
 
-# summary of current metrics for entire state
-stateCurrentMetricSummary <- allLocalMetricsByDate %>%
-  filter(Date == max(Date)) %>%
-  group_by(Date) %>%
-  SummarizeMetrics()
-
-# summary of current metrics for health planning regions
-healthPlanningRegionCurrentMetricSummary <- allLocalMetricsByDate %>%
-  filter(Date == max(Date)) %>%
-  group_by(Date, HealthPlanningRegion) %>%
-  SummarizeMetrics()
-
-# summary of current metrics for health districts
-healthDistrictCurrentMetricSummary <- allLocalMetricsByDate %>%
-  filter(Date == max(Date)) %>%
-  group_by(Date, HealthPlanningRegion, HealthDistrict) %>%
-  SummarizeMetrics()
-
-# summary of current metrics for localities
-localityCurrentMetricSummary <- allLocalMetricsByDate %>%
-  filter(Date == max(Date))
+###############################
+## STATE METRIC CALCULATIONS ##
+###############################
 
 # summary of metrics for entire state for all dates
 stateMetricSummaryByDate <- allLocalMetricsByDate %>%
   group_by(Date) %>%
   SummarizeMetrics()
+
+# summary of current metrics for entire state
+stateCurrentMetricSummary <- stateMetricSummaryByDate %>%
+  filter(Date == max(Date))
 
 # summary of daily new metrics with moving averages
 stateNewMetricSummaryByDate <- stateMetricSummaryByDate %>%
@@ -142,16 +128,89 @@ stateNewMetricSummaryByDate <- stateMetricSummaryByDate %>%
     )
   )
 
+# summary of current daily new metrics
+stateCurrentNewMetricSummary <- stateNewMetricSummaryByDate %>%
+  filter(Date == max(Date)) %>%
+  select(Date, NewCases, NewHospitalizations, NewDeaths)
+
+################################################
+## HEALTH PLANNING REGION METRIC CALCULATIONS ##
+################################################
+
+# summary of metrics for health planning regions for all dates
+healthPlanningRegionMetricSummaryByDate <- allLocalMetricsByDate %>%
+  group_by(Date, HealthPlanningRegion) %>%
+  SummarizeMetrics() %>%
+  ungroup()
+
+# summary of current metrics for health planning regions
+healthPlanningRegionCurrentMetricSummary <- healthPlanningRegionMetricSummaryByDate %>%
+  filter(Date == max(Date))
+
+# summary of daily new metrics with moving averages
+healthPlanningRegionNewMetricSummaryByDate <- healthPlanningRegionMetricSummaryByDate %>%
+  select(Date, HealthPlanningRegion,TotalCases, Hospitalizations, Deaths) %>%
+  group_by(HealthPlanningRegion) %>%
+  mutate(
+    NewCases = TotalCases - lag(TotalCases, default = 0),
+    NewHospitalizations = Hospitalizations - lag(Hospitalizations, default = 0),
+    NewDeaths = Deaths - lag(Deaths, default = 0)
+  ) %>%
+  select(Date, HealthPlanningRegion, NewCases, NewHospitalizations, NewDeaths) %>%
+  group_by(HealthPlanningRegion) %>%
+  mutate(
+    NewCases_7MA = round(
+      rollmean(NewCases, k = 7, fill = NA),
+      digits = 2
+    ),
+    NewHospitalizations_7MA = round(
+      rollmean(NewHospitalizations, k = 7, fill = NA),
+      digits = 2
+    ),
+    NewDeaths_7MA = round(
+      rollmean(NewDeaths, k = 7, fill = NA),
+      digits = 2
+    )
+  ) %>%
+  ungroup()
+
+healthPlanningRegionCurrentNewMetricSummary <- healthPlanningRegionNewMetricSummaryByDate %>%
+  filter(Date == max(Date)) %>%
+  select(Date, NewCases, NewHospitalizations, NewDeaths)
+
+#########################################
+## HEALTH DISTRICT METRIC CALCULATIONS ##
+#########################################
+
+# summary of current metrics for health districts
+healthDistrictCurrentMetricSummary <- allLocalMetricsByDate %>%
+  filter(Date == max(Date)) %>%
+  group_by(Date, HealthPlanningRegion, HealthDistrict) %>%
+  SummarizeMetrics()
+
+##################################
+## LOCALITY METRIC CALCULATIONS ##
+##################################
+
+# summary of current metrics for localities
+localityCurrentMetricSummary <- allLocalMetricsByDate %>%
+  filter(Date == max(Date))
+
+
+
 # objects to save
 toSave <- list(
   SCMS = stateCurrentMetricSummary,
-  HPRCMS = healthPlanningRegionCurrentMetricSummary,
-  HDCMS = healthDistrictCurrentMetricSummary,
-  LCMS = localityCurrentMetricSummary,
   SMSBD = stateMetricSummaryByDate,
-  SNMSBD = stateNewMetricSummaryByDate
+  SCNMS = stateCurrentNewMetricSummary,
+  SNMSBD = stateNewMetricSummaryByDate,
+  HPRCMS = healthPlanningRegionCurrentMetricSummary,
+  HPRMSBD = healthPlanningRegionMetricSummaryByDate,
+  HPRCNMS = healthPlanningRegionCurrentNewMetricSummary,
+  HPRNMSBD = healthPlanningRegionNewMetricSummaryByDate
 )
 
+# write to disk
 saveRDS(
   object = toSave,
   file = "data/covid.rds"

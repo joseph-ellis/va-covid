@@ -1,20 +1,20 @@
 
 # basic single line chart
-HighChartSingleLineDate <- function(.data, .yTitle) {
+HighChartMultiLineDate <- function(.data, .yTitle) {
   highchart() %>%
     hc_add_series(
-      name = .yTitle(),
       data = .data(),
       type = "line",
       hcaes(
         x = as.Date(plotX),
-        y = plotY
+        y = plotY,
+        group = plotGroup
       )
     )
 }
 
 # application specific styling
-StyleSingleLineDate <- function(.hc, .yTitle) {
+StyleMultiLineDate <- function(.hc, .yTitle) {
 
   # callback function for formatting y-axis labels
   JS_yAxisFormatter <- V8::JS(
@@ -28,17 +28,21 @@ StyleSingleLineDate <- function(.hc, .yTitle) {
     }"
   )
 
-  # callback function for formatting tooltip values
-  JS_tooltipPointFormatter <- V8::JS(
+  JS_tooltipFormatter <- V8::JS(
     "function() {
-      if(this.y < 1 && this.y > 0) {
-        return '<strong>' + this.series.name + ':  </strong>' +
-          Highcharts.numberFormat((this.y * 100), 2) + '%';
-      }
-      else {
-        return '<strong>' + this.series.name + ':  </strong>' +
-          Highcharts.numberFormat(this.y, 0);
-      }
+      return this.points.reduce(function(s, point) {
+        var value = point.y;
+
+        if(value < 1 && value > 0) {
+          value = Highcharts.numberFormat((value * 100), 2) + '%';
+        }
+        else {
+          value = Highcharts.numberFormat(value, 0);
+        }
+
+        return s + '<span style=\"color:' + point.color + '\">●</span>' +
+          '<strong>' + point.series.name + ':  </strong>' + value + '<br />';
+      }, Highcharts.dateFormat('%B %d, %Y', this.x) + '<br />');
     }"
   )
 
@@ -67,11 +71,10 @@ StyleSingleLineDate <- function(.hc, .yTitle) {
       crosshair = TRUE
     ) %>%
     hc_legend(
-      enabled = FALSE
+      enabled = TRUE
     ) %>%
     hc_plotOptions(
       line = list(
-        color = "#21445F",
         lineWidth = 4,
         marker = list(
           enabled = FALSE
@@ -81,7 +84,7 @@ StyleSingleLineDate <- function(.hc, .yTitle) {
     ) %>%
     hc_tooltip(
       useHTML = TRUE,
-      headerFormat = "{point.x:%B %d, %Y} <br />",
-      pointFormatter = JS_tooltipPointFormatter
+      formatter = JS_tooltipFormatter,
+      shared = TRUE
     )
 }
