@@ -91,6 +91,16 @@ SummarizeMetrics <- function(.data) {
     )
 }
 
+MovingAverage7Day <- function(.field) {
+  round(
+    rollmean(
+      .field,
+      k = 7,
+      fill = NA
+    )
+  )
+}
+
 ###############################
 ## STATE METRIC CALCULATIONS ##
 ###############################
@@ -114,18 +124,9 @@ stateNewMetricSummaryByDate <- stateMetricSummaryByDate %>%
   ) %>%
   select(Date, NewCases, NewHospitalizations, NewDeaths) %>%
   mutate(
-    NewCases_7MA = round(
-      rollmean(NewCases, k = 7, fill = NA),
-      digits = 2
-    ),
-    NewHospitalizations_7MA = round(
-      rollmean(NewHospitalizations, k = 7, fill = NA),
-      digits = 2
-    ),
-    NewDeaths_7MA = round(
-      rollmean(NewDeaths, k = 7, fill = NA),
-      digits = 2
-    )
+    NewCases_7MA = MovingAverage7Day(NewCases),
+    NewHospitalizations_7MA = MovingAverage7Day(NewHospitalizations),
+    NewDeaths_7MA = MovingAverage7Day(NewDeaths)
   )
 
 # summary of current daily new metrics
@@ -159,18 +160,9 @@ healthPlanningRegionNewMetricSummaryByDate <- healthPlanningRegionMetricSummaryB
   select(Date, HealthPlanningRegion, NewCases, NewHospitalizations, NewDeaths) %>%
   group_by(HealthPlanningRegion) %>%
   mutate(
-    NewCases_7MA = round(
-      rollmean(NewCases, k = 7, fill = NA),
-      digits = 2
-    ),
-    NewHospitalizations_7MA = round(
-      rollmean(NewHospitalizations, k = 7, fill = NA),
-      digits = 2
-    ),
-    NewDeaths_7MA = round(
-      rollmean(NewDeaths, k = 7, fill = NA),
-      digits = 2
-    )
+    NewCases_7MA = MovingAverage7Day(NewCases),
+    NewHospitalizations_7MA = MovingAverage7Day(NewHospitalizations),
+    NewDeaths_7MA = MovingAverage7Day(NewDeaths)
   ) %>%
   ungroup()
 
