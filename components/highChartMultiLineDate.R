@@ -14,7 +14,7 @@ HighChartMultiLineDate <- function(.data, .yTitle) {
 }
 
 # application specific styling
-StyleMultiLineDate <- function(.hc, .yTitle) {
+StyleMultiLineDate <- function(.hc, .yTitle, .subtitle) {
 
   # callback function for formatting y-axis labels
   JS_yAxisFormatter <- V8::JS(
@@ -86,5 +86,19 @@ StyleMultiLineDate <- function(.hc, .yTitle) {
       useHTML = TRUE,
       formatter = JS_tooltipFormatter,
       shared = TRUE
+    ) %>%
+    hc_title(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+    ) %>%
+    hc_subtitle(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = .subtitle
     )
 }

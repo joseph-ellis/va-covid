@@ -10,7 +10,7 @@ source("R/DataAccess.R")
 metrics <- c("total_cases", "hospitalizations", "deaths")
 
 # build base object for generating summaries
-allLocalMetricsByDate <- vdoh_data$CasesLocality %>%
+localMetricSummaryByDate <- vdoh_data$CasesLocality %>%
   left_join(
     vaMapData,
     by.x = locality,
@@ -102,12 +102,39 @@ MovingAverage7Day <- function(.field) {
   )
 }
 
+localCurrentMetricSummary <- localMetricSummaryByDate %>%
+  filter(Date == max(Date))
+
+localNewMetricSummaryByDate <- localMetricSummaryByDate %>%
+  select(Date, fips, HealthPlanningRegion, HealthDistrict, Locality, LocalityCode,
+         TotalCases, Hospitalizations, Deaths) %>%
+  group_by(fips, HealthPlanningRegion, HealthDistrict, Locality, LocalityCode) %>%
+  mutate(
+    NewCases = TotalCases - lag(TotalCases, default = 0),
+    NewHospitalizations = Hospitalizations - lag(Hospitalizations, default = 0),
+    NewDeaths = Deaths - lag(Deaths, default = 0)
+  ) %>%
+  select(Date, fips, HealthPlanningRegion, HealthDistrict, Locality, LocalityCode,
+         NewCases, NewHospitalizations, NewDeaths) %>%
+  group_by(fips, HealthPlanningRegion, HealthDistrict, Locality, LocalityCode) %>%
+  mutate(
+    NewCases_7MA = MovingAverage7Day(NewCases),
+    NewHospitalizations_7MA = MovingAverage7Day(NewHospitalizations),
+    NewDeaths_7MA = MovingAverage7Day(NewDeaths)
+  ) %>%
+  ungroup()
+
+localCurrentNewMetricSummaryByDate <- localNewMetricSummaryByDate %>%
+  filter(Date == max(Date)) %>%
+  select(Date, fips, HealthPlanningRegion, HealthDistrict, Locality, LocalityCode,
+         NewCases, NewHospitalizations, NewDeaths)
+
 ###############################
 ## STATE METRIC CALCULATIONS ##
 ###############################
 
 # summary of metrics for entire state for all dates
-stateMetricSummaryByDate <- allLocalMetricsByDate %>%
+stateMetricSummaryByDate <- localMetricSummaryByDate %>%
   group_by(Date) %>%
   SummarizeMetrics()
 
@@ -140,7 +167,7 @@ stateCurrentNewMetricSummary <- stateNewMetricSummaryByDate %>%
 ################################################
 
 # summary of metrics for health planning regions for all dates
-healthPlanningRegionMetricSummaryByDate <- allLocalMetricsByDate %>%
+healthPlanningRegionMetricSummaryByDate <- localMetricSummaryByDate %>%
   group_by(Date, HealthPlanningRegion) %>%
   SummarizeMetrics() %>%
   ungroup()
@@ -176,7 +203,7 @@ healthPlanningRegionCurrentNewMetricSummary <- healthPlanningRegionNewMetricSumm
 #########################################
 
 # summary of current metrics for health districts
-healthDistrictCurrentMetricSummary <- allLocalMetricsByDate %>%
+healthDistrictCurrentMetricSummary <- localMetricSummaryByDate %>%
   filter(Date == max(Date)) %>%
   group_by(Date, HealthPlanningRegion, HealthDistrict) %>%
   SummarizeMetrics()
@@ -186,13 +213,17 @@ healthDistrictCurrentMetricSummary <- allLocalMetricsByDate %>%
 ##################################
 
 # summary of current metrics for localities
-localityCurrentMetricSummary <- allLocalMetricsByDate %>%
+localityCurrentMetricSummary <- localMetricSummaryByDate %>%
   filter(Date == max(Date))
 
 
 
 # objects to save
 toSave <- list(
+  LCMS = localCurrentMetricSummary,
+  LMSBD = localMetricSummaryByDate,
+  LCNMS = localCurrentNewMetricSummaryByDate,
+  LNMSBD = localNewMetricSummaryByDate,
   SCMS = stateCurrentMetricSummary,
   SMSBD = stateMetricSummaryByDate,
   SCNMS = stateCurrentNewMetricSummary,

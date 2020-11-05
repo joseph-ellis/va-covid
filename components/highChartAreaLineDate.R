@@ -23,7 +23,7 @@ HighChartAreaLineDate <- function(.data, .yTitle) {
 }
 
 # application specific styling
-StyleAreaLineDate <- function(.hc, .yTitle) {
+StyleAreaLineDate <- function(.hc, .yTitle, .subtitle) {
 
   # styling
   .hc %>%
@@ -74,5 +74,19 @@ StyleAreaLineDate <- function(.hc, .yTitle) {
       headerFormat = "{point.x:%B %d, %Y} <br />",
       pointFormat = "<strong>{series.name}:</strong>  {point.y}<br />",
       shared = TRUE
+    ) %>%
+    hc_title(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+    ) %>%
+    hc_subtitle(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = .subtitle
     )
 }

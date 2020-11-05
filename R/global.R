@@ -13,15 +13,25 @@ options(highcharter.lang = hcOptions)
 ###########################################################
 
 # generate a gradient palette using the viridis package
-ViridisStops <- function(.n, .option) {
+ViridisStops <- function(.n, .option = "D", .reverse = FALSE) {
   library(viridis)
 
   stops <- data.frame(
     q = 1:.n / .n,
-    c = viridis(
-      n = .n,
-      option = .option
-    ),
+    c = if (.reverse == TRUE) {
+          rev(
+            viridis(
+              n = .n,
+              option = .option
+            )
+          )
+        }
+        else {
+          viridis(
+            n = .n,
+            option = .option
+          )
+        },
     stringsAsFactors = FALSE
   )
 
@@ -29,15 +39,25 @@ ViridisStops <- function(.n, .option) {
 }
 
 # generate a gradient palette using the RColorBrewer package
-BrewerStops <- function(.n, .name) {
+BrewerStops <- function(.n, .name, .reverse = FALSE) {
   library(RColorBrewer)
 
   stops <- data.frame(
     q = 1:.n / .n,
-    c = brewer.pal(
-      n = .n,
-      name = .name
-    ),
+    c = if (.reverse == TRUE) {
+        rev(
+          brewer.pal(
+            n = .n,
+            name = .name
+          )
+        )
+    }
+    else {
+      brewer.pal(
+        n = .n,
+        name = .name
+      )
+    },
     stringsAsFactors = FALSE
   )
 

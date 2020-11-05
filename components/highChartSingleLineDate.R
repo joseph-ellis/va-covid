@@ -14,7 +14,7 @@ HighChartSingleLineDate <- function(.data, .yTitle) {
 }
 
 # application specific styling
-StyleSingleLineDate <- function(.hc, .yTitle) {
+StyleSingleLineDate <- function(.hc, .yTitle, .subtitle) {
 
   # callback function for formatting y-axis labels
   JS_yAxisFormatter <- V8::JS(
@@ -83,5 +83,19 @@ StyleSingleLineDate <- function(.hc, .yTitle) {
       useHTML = TRUE,
       headerFormat = "{point.x:%B %d, %Y} <br />",
       pointFormatter = JS_tooltipPointFormatter
+    ) %>%
+    hc_title(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+    ) %>%
+    hc_subtitle(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = .subtitle
     )
 }

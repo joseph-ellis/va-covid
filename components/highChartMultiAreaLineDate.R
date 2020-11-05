@@ -40,7 +40,7 @@ JS_tooltipFormatter <- V8::JS(
 )
 
 # application specific styling
-StyleMultiAreaLineDate <- function(.hc, .yTitle) {
+StyleMultiAreaLineDate <- function(.hc, .yTitle, .subtitle) {
 
   # styling
   .hc %>%
@@ -69,9 +69,6 @@ StyleMultiAreaLineDate <- function(.hc, .yTitle) {
       tickAmount = 5,
       crosshair = TRUE
     ) %>%
-    hc_legend(
-      enabled = FALSE
-    ) %>%
     hc_plotOptions(
       area = list(
         fillOpacity = 0.5,
@@ -94,5 +91,19 @@ StyleMultiAreaLineDate <- function(.hc, .yTitle) {
       #pointFormat = "<strong>{series.name}:</strong>  {point.y}<br />",
       formatter = JS_tooltipFormatter,
       shared = TRUE
+    ) %>%
+    hc_title(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+    ) %>%
+    hc_subtitle(
+      align = "left",
+      style = list(
+        color = "#21445F"
+      ),
+      text = .subtitle
     )
 }
