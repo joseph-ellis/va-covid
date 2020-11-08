@@ -18,7 +18,7 @@ StyleSingleLineDate <- function(.hc, .yTitle, .subtitle) {
 
   # callback function for formatting y-axis labels
   JS_yAxisFormatter <- V8::JS(
-    "function() {
+    "function () {
       if(this.value < 1 && this.value > 0) {
         return Highcharts.numberFormat((this.value * 100), 0) + '%';
       }
@@ -30,7 +30,7 @@ StyleSingleLineDate <- function(.hc, .yTitle, .subtitle) {
 
   # callback function for formatting tooltip values
   JS_tooltipPointFormatter <- V8::JS(
-    "function() {
+    "function () {
       if(this.y < 1 && this.y > 0) {
         return '<strong>' + this.series.name + ':  </strong>' +
           Highcharts.numberFormat((this.y * 100), 2) + '%';
@@ -89,7 +89,7 @@ StyleSingleLineDate <- function(.hc, .yTitle, .subtitle) {
       style = list(
         color = "#21445F"
       ),
-      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+      text = paste0("COVID-19 ", .yTitle())
     ) %>%
     hc_subtitle(
       align = "left",

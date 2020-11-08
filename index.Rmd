@@ -29,7 +29,7 @@ runtime: shiny
   }
 
   .panel {
-    margin-top: 8px;
+    margin-top: 10px;
   }
   
   .panel-heading {
@@ -38,6 +38,14 @@ runtime: shiny
   
   .panel-title {
     font-size: 18px;
+  }
+  
+  td:first-child {
+    font-weight: bold;
+  }
+  
+  ul {
+    list-style-type: none;
   }
   
   .value-box {
@@ -58,7 +66,6 @@ library(lubridate)
 library(RSocrata)
 library(scales)
 library(shiny)
-library(shinyEffects)
 library(shinyjs)
 library(shinythemes)
 library(shinyWidgets)
@@ -113,15 +120,18 @@ dataDate <- covid$SCNMS$Date[1] %>%
   ReadableDate()
 
 # common subtitle for charts
-chartSubtitle <- paste0("Data reported by the Virginia Department of Health as of ", dataDate)
+chartSubtitle <- paste0(
+  "Data reported by the Virginia Department of Health as of ", 
+  dataDate
+)
 
 ```
 
 State Metric Summary {data-navmenu="State"}
-===============================================================================
+================================================================================
 
 Sidebar {.sidebar}
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 ```{r sidebar_state-summary}
 
 # user input panel
@@ -151,33 +161,40 @@ panel(
 )
 
 # change metrics in the dropdown menu based on selected chart type
-observeEvent(input$stateSummaryChartType, {
-  metricChoices <- switch(
-    input$stateSummaryChartType,
-    "Cumulative Totals" = list(
-      Counts = metricsCount,
-      Rates = metricsRate
-    ),
-    "Daily New Values" = metricsNew
-  )
-  
-  updatePickerInput(
-    session = session,
-    inputId = "stateSummaryMetric",
-    choices = metricChoices
-  )
-})
+# FIRES ON CHART TYPE CHANGE
+observeEvent(
+  label = "stateSummaryChartTypeSelection",
+  input$stateSummaryChartType, {
+    metricChoices <- switch(
+      input$stateSummaryChartType,
+      "Cumulative Totals" = list(
+        Counts = metricsCount,
+        Rates = metricsRate
+      ),
+      "Daily New Values" = metricsNew
+    )
+    
+    updatePickerInput(
+      session = session,
+      inputId = "stateSummaryMetric",
+      choices = metricChoices
+    )
+  }
+)
 
 ```
 
 Row
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 ### Total Cases
 ```{r value-box_state_total-cases}
 
 # display total cases
 valueBox(
-  value = format(covid$SCMS$TotalCases, big.mark = ","),
+  value = format(
+    covid$SCMS$TotalCases, 
+    big.mark = ","
+  ),
   caption = "Total Cases in Virginia",
   icon = "fa-thermometer-three-quarters",
   color = "danger"
@@ -190,7 +207,10 @@ valueBox(
 
 # display total hospitalizations
 valueBox(
-  value = format(covid$SCMS$Hospitalizations, big.mark = ","),
+  value = format(
+    covid$SCMS$Hospitalizations, 
+    big.mark = ","
+  ),
   caption = "Total Hospitalizations in Virginia",
   icon = "fa-hospital",
   color = "danger"
@@ -203,7 +223,10 @@ valueBox(
 
 # display total deaths
 valueBox(
-  value = format(covid$SCMS$Deaths, big.mark = ","),
+  value = format(
+    covid$SCMS$Deaths, 
+    big.mark = ","
+  ),
   caption = "Total Deaths in Virginia",
   icon = "fa-ambulance",
   color = "danger"
@@ -212,7 +235,7 @@ valueBox(
 ```
 
 Row
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 ### Cases per 100K
 ```{r value-box_state_cases-100k}
 
@@ -234,7 +257,10 @@ valueBox(
 
 # display hospitalization rate
 valueBox(
-  value = percent(covid$SCMS$PercentCasesHospitalized, accuracy = 0.1),
+  value = percent(
+    covid$SCMS$PercentCasesHospitalized, 
+    accuracy = 0.1
+  ),
   caption = "Hospitalization Rate in Virginia",
   icon = "fa-hospital",
   color = "warning"
@@ -247,7 +273,10 @@ valueBox(
 
 # display mortality rate
 valueBox(
-  value = percent(covid$SCMS$MortalityRate, accuracy = 0.1),
+  value = percent(
+    covid$SCMS$MortalityRate, 
+    accuracy = 0.1
+  ),
   caption = "Mortality Rate in Virginia",
   icon = "fa-ambulance",
   color = "warning"
@@ -256,72 +285,102 @@ valueBox(
 ```
 
 Row
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 
 ### `r renderUI(HTML("<h5 class='chart-title-text'>State Summary Metrics</h5>"))`
 ```{r hc_state_summary}
 
 # reactive object for chart data
-stateSummaryChartData <- eventReactive(input$stateSummaryMetric, {
-  chosenMetric <- switch(
-    input$stateSummaryMetric,
-    "Total Cases" = "TotalCases",
-    "Total Hospitalizations" = "Hospitalizations",
-    "Total Deaths" = "Deaths",
-    "Cases per 100K" = "CasesPer100K",
-    "Hospitalization Rate" = "PercentCasesHospitalized",
-    "Hospitalization per 100K" = "HospitalizationsPer100K",
-    "Mortality Rate" = "MortalityRate",
-    "Deaths per 100K" = "DeathsPer100K",
-    "New Cases" = "NewCases",
-    "New Hospitalizations" = "NewHospitalizations",
-    "New Deaths" = "NewDeaths" 
-  )
-  
-  chosenAverage <- switch(
-    input$stateSummaryMetric,
-    "New Cases" = "NewCases_7MA",
-    "New Hospitalizations" = "NewHospitalizations_7MA",
-    "New Deaths" = "NewDeaths_7MA" 
-  )
-  
-  output <- switch(
-    input$stateSummaryChartType,
-    "Cumulative Totals" = covid$SMSBD %>% 
-      select("plotX" = Date, "plotY" = all_of(chosenMetric)),
-    "Daily New Values" = covid$SNMSBD %>% 
-      select("plotX" = Date, "plotYC" = all_of(chosenMetric), "plotYL" = all_of(chosenAverage))
-  )
-})
+# FIRES ON METRIC VALUE CHANGE
+stateSummaryChartData <- eventReactive(
+  label = "stateSummarySetChartData",
+  input$stateSummaryMetric, {
+    chosenMetric <- switch(
+      input$stateSummaryMetric,
+      "Total Cases" = "TotalCases",
+      "Total Hospitalizations" = "Hospitalizations",
+      "Total Deaths" = "Deaths",
+      "Cases per 100K" = "CasesPer100K",
+      "Hospitalization Rate" = "PercentCasesHospitalized",
+      "Hospitalization per 100K" = "HospitalizationsPer100K",
+      "Mortality Rate" = "MortalityRate",
+      "Deaths per 100K" = "DeathsPer100K",
+      "New Cases" = "NewCases",
+      "New Hospitalizations" = "NewHospitalizations",
+      "New Deaths" = "NewDeaths" 
+    )
+    
+    chosenAverage <- switch(
+      input$stateSummaryMetric,
+      "New Cases" = "NewCases_7MA",
+      "New Hospitalizations" = "NewHospitalizations_7MA",
+      "New Deaths" = "NewDeaths_7MA" 
+    )
+    
+    output <- switch(
+      input$stateSummaryChartType,
+      "Cumulative Totals" = covid$SMSBD %>% 
+        select(
+          "plotX" = Date, 
+          "plotY" = all_of(chosenMetric)
+        ),
+      "Daily New Values" = covid$SNMSBD %>% 
+        select(
+          "plotX" = Date, 
+          "plotYC" = all_of(chosenMetric), 
+          "plotYL" = all_of(chosenAverage)
+        )
+    )
+  }
+)
 
 # reactive object for the y-axis title
-summaryYAxisTitle <- eventReactive(input$stateSummaryMetric, {
-  output <- input$stateSummaryMetric
-})
+# FIRES ON METRIC VALUE CHANGE
+summaryYAxisTitle <- eventReactive(
+  label = "summayYAxisTitle",
+  input$stateSummaryMetric, {
+    output <- input$stateSummaryMetric
+  }
+)
 
 # reactive object to plot chart type based on selection
-stateSummaryPlotter <- eventReactive(input$stateSummaryMetric, {
-  switch(
-    input$stateSummaryChartType,
-    "Cumulative Totals" = HighChartSingleLineDate(stateSummaryChartData, summaryYAxisTitle) %>%
-      StyleSingleLineDate(summaryYAxisTitle, chartSubtitle),
-    "Daily New Values" = HighChartAreaLineDate(stateSummaryChartData, summaryYAxisTitle) %>%
-      StyleAreaLineDate(summaryYAxisTitle, chartSubtitle)
-  )
-})
+# FIRES ON METRIC VALUE CHANGE
+stateSummaryPlotter <- eventReactive(
+  input$stateSummaryMetric, {
+    switch(
+      input$stateSummaryChartType,
+      "Cumulative Totals" = HighChartSingleLineDate(
+        stateSummaryChartData, 
+        summaryYAxisTitle
+      ) %>%
+        StyleSingleLineDate(
+          summaryYAxisTitle, 
+          chartSubtitle
+        ),
+      "Daily New Values" = HighChartAreaLineDate(
+        stateSummaryChartData, 
+        summaryYAxisTitle
+      ) %>%
+        StyleAreaLineDate(
+          summaryYAxisTitle, 
+          chartSubtitle
+        )
+    )
+  }
+)
 
 # render the chart
-renderHighchart({
+renderHighchart(
   stateSummaryPlotter()
-})
+)
 
 ```
 
 Health Planning Region Summary {data-navmenu="Health Planning Regions"}
-===============================================================================
+================================================================================
 
 Sidebar {.sidebar}
--------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
 ```{r sidebar_hpr-summary}
 
 # enable use of shinyjs
@@ -335,13 +394,6 @@ hpr <- covid$HPRCMS %>%
 hprAll <- hpr %>%
   add_row(
     HealthPlanningRegion = "All Regions",
-    .before = 1
-  )
-
-# list of health planning regions for dropdown with "None" option
-hprNone <- hpr %>%
-  add_row(
-    HealthPlanningRegion = "None",
     .before = 1
   )
 
@@ -381,99 +433,170 @@ panel(
     pickerInput(
       inputId = "hprCompare",
       label = "Planning region to compare...",
-      choices = hprNone
+      choices = NULL
     )
   )
 )
 
 # change metrics in the dropdown menus based on selected chart type
-observeEvent(input$hprSummaryChartType, {
-  metricChoices <- switch(
-    input$hprSummaryChartType,
-    "Cumulative Totals" = list(
-      Counts = metricsCount,
-      Rates = metricsRate
-    ),
-    "Daily New Values" = metricsNew
-  )
+# FIRES ON CHART TYPE CHANGE
+observeEvent(
+  input$hprSummaryChartType, {
+    metricChoices <- switch(
+      input$hprSummaryChartType,
+      "Cumulative Totals" = list(
+        Counts = metricsCount,
+        Rates = metricsRate
+      ),
+      "Daily New Values" = metricsNew
+    )
   
-  updatePickerInput(
-    session = session,
-    inputId = "hprSummaryMetric",
-    choices = metricChoices
-  )
+    updatePickerInput(
+      session = session,
+      inputId = "hprSummaryMetric",
+      choices = metricChoices
+    )
   
-  hprChoices <- switch(
-    input$hprSummaryChartType,
-    "Cumulative Totals" = hprAll,
-    "Daily New Values" = hpr
-  )
+    hprChoices <- switch(
+      input$hprSummaryChartType,
+      "Cumulative Totals" = hprAll,
+      "Daily New Values" = hpr
+    )
   
-  updatePickerInput(
-    session = session,
-    inputId = "hpr",
-    choices = hprChoices
-  )
+    updatePickerInput(
+      session = session,
+      inputId = "hpr",
+      choices = hprChoices
+    )
   
-  if (input$hprSummaryChartType == "Cumulative Totals") {
-    rv$hprComparison <- 0
+    if (input$hprSummaryChartType == "Cumulative Totals") {
+      rv$hprComparison <- 0
+    }
+    else {
+      rv$hprComparison <- 1
+    }
   }
-  else {
-    rv$hprComparison <- 1
-  }
-})
+)
 
 # show or hide comparison dropdown
-observeEvent(rv$hprComparison, {
-  if (rv$hprComparison == 0) {
-    hide(selector = "select[id='hprCompare']")
-    
-    updatePickerInput(
-      inputId = "hprCompare",
-      session = session,
-      selected = "None"
-    )
-  }
-  else {
-    show(selector = "select[id='hprCompare']")
-  }
+# FIRES ON REACTIVE VALUE CHANGE
+observeEvent(
+  rv$hprComparison, {
+    if (rv$hprComparison == 0) {
+      hide(selector = "select[id='hprCompare']")
+      
+      updatePickerInput(
+        inputId = "hprCompare",
+        session = session,
+        selected = "None"
+      )
+    }
+    else {
+      show(selector = "select[id='hprCompare']")
+      
+      hprNone <- covid$HPRCMS %>%
+        filter(HealthPlanningRegion != input$hpr) %>%
+        distinct(HealthPlanningRegion) %>%
+        add_row(
+          HealthPlanningRegion = "None",
+          .before = 1
+        )
+      
+      updatePickerInput(
+        inputId = "hprCompare",
+        session = session,
+        choices = hprNone,
+        selected = "None"
+      )
+    }
 })
 
-chosenHPRData <- reactive({
+# reactive object to hold primary health planning region data
+chosenHPRData <- reactive(
   covid$HPRCMS %>%
     filter(HealthPlanningRegion == input$hpr)
-})
+)
 
-chosenComparisonData <- reactive({
+# reactive object to hold second health planning region data for comparison
+chosenComparisonData <- reactive(
   covid$HPRCMS %>%
     filter(HealthPlanningRegion == input$hprComparison)
-})
+)
 
-hprData <- eventReactive(c(input$hpr, input$hprCompare), {
-  if (input$hprCompare == "None") {
-    chosenHPRData()
+# reactive object to build the data set for the page
+# FIRES ON CHANGE TO BOTH HEALTH PLANNING REGION CHANGES
+hprData <- eventReactive(
+  c(input$hpr, input$hprCompare), {
+    if (input$hprCompare == "None") {
+      chosenHPRData()
+    }
+    else {
+      bind_rows(chosenHPRData(), chosenComparisonData())
+    }
   }
-  else {
-    rbind(chosenHPRData(), chosenComparisonData())
+)
+
+# reactive object to hold the health districts within the selected health
+# planning region
+# FIRES ON PRIMARY HEALTH PLANNING REGION CHANGE
+districtsIncluded <- eventReactive(
+  input$hpr, {
+    districts <- covid$LCMS %>%
+      filter(HealthPlanningRegion == input$hpr) %>%
+      distinct(HealthDistrict)
+  
+    htmlString <- ""
+  
+    for (i in 1:nrow(districts)) {
+      htmlString <- paste0(
+        htmlString,
+        "<li>",
+        districts$HealthDistrict[i],
+        "</li>"
+      )
+    }
+  
+    return(htmlString)
   }
-})
+)
 
-districtsIncluded <- eventReactive(input$hpr, {
-  covid$HDCMS %>%
-    filter(HealthPlanningRegion == input$hpr) %>%
-    distinct(HealthDistrict)
-})
+# UI element to display the health districts within the chosen health planning
+# region
+panel(
+  heading = "Health Districts",
+  status = "warning",
+  renderUI({
+    HTML(
+      paste0(
+        "The <strong>", 
+        input$hpr, 
+        "</strong> health planning region includes the following districts:"
+      )
+    )
+  }),
+  renderUI({
+    HTML(
+      paste0(
+        "<br /><ul>",
+        districtsIncluded(),
+        "</ul>"
+      )
+    )
+  })
+)
 
-# panel(
-#   heading = "Planning Districts",
-#   status = "warning",
-#   renderText({
-#     paste("The", input$hpr, "health planning region includes the following districts:")
-#   }),
-#   renderTable({
-#     districtsIncluded()
-#   })
-# )
+# show or hide the health districts panel
+# FIRES ON PRIMARY HEALTH PLANNING REGION CHANGE
+observeEvent(
+  input$hpr, {
+    if (input$hpr == "All Regions") {
+      hide(selector = "div[class='panel panel-warning']")
+    }
+    else {
+      show(selector = "div[class='panel panel-warning']")
+    }
+  }
+)
 
 ```
 
@@ -486,7 +609,10 @@ Row
 renderValueBox({
   if (input$hpr == "All Regions") {
     valueBox(
-      value = format(covid$SCMS$TotalCases, big.mark = ","),
+      value = format(
+        covid$SCMS$TotalCases, 
+        big.mark = ","
+      ),
       caption = "Total Cases in Virginia",
       icon = "fa-thermometer-three-quarters",
       color = "danger"
@@ -494,8 +620,15 @@ renderValueBox({
   }
   else {
     valueBox(
-      value = format(chosenHPRData()$TotalCases, big.mark = ","),
-      caption = paste0("Total Cases in the ", input$hpr, " Health Planning Region"),
+      value = format(
+        chosenHPRData()$TotalCases, 
+        big.mark = ","
+      ),
+      caption = paste0(
+        "Total Cases in the ", 
+        input$hpr, 
+        " Health Planning Region"
+      ),
       icon = "fa-thermometer-three-quarters",
       color = "danger"
     )
@@ -511,7 +644,10 @@ renderValueBox({
 renderValueBox({
   if (input$hpr == "All Regions") {
     valueBox(
-      value = format(covid$SCMS$Hospitalizations, big.mark = ","),
+      value = format(
+        covid$SCMS$Hospitalizations, 
+        big.mark = ","
+      ),
       caption = "Total Hospitalizations in Virginia",
       icon = "fa-hospital",
       color = "danger"
@@ -519,8 +655,15 @@ renderValueBox({
   }
   else {
     valueBox(
-      value = format(chosenHPRData()$Hospitalizations, big.mark = ","),
-      caption = paste0("Total Hospitalizations in the ", input$hpr, " Health Planning Region"),
+      value = format(
+        chosenHPRData()$Hospitalizations, 
+        big.mark = ","
+      ),
+      caption = paste0(
+        "Total Hospitalizations in the ", 
+        input$hpr, 
+        " Health Planning Region"
+      ),
       icon = "fa-hospital",
       color = "danger"
     )
@@ -536,7 +679,10 @@ renderValueBox({
 renderValueBox({
   if (input$hpr == "All Regions") {
     valueBox(
-      value = format(covid$SCMS$Deaths, big.mark = ","),
+      value = format(
+        covid$SCMS$Deaths, 
+        big.mark = ","
+      ),
       caption = "Total Deaths in Virginia",
       icon = "fa-ambulance",
       color = "danger"
@@ -544,8 +690,15 @@ renderValueBox({
   }
   else {
     valueBox(
-      value = format(chosenHPRData()$Deaths, big.mark = ","),
-      caption = paste0("Total Deaths in the ", input$hpr, " Health Planning Region"),
+      value = format(
+        chosenHPRData()$Deaths, 
+        big.mark = ","
+      ),
+      caption = paste0(
+        "Total Deaths in the ", 
+        input$hpr, 
+        " Health Planning Region"
+      ),
       icon = "fa-ambulance",
       color = "danger"
     )
@@ -578,7 +731,11 @@ renderValueBox({
         round(chosenHPRData()$CasesPer100K),
         big.mark = ","
       ),
-      caption = paste0("Cases per 100K People in the ", input$hpr, " Health Planning Region"),
+      caption = paste0(
+        "Cases per 100K People in the ", 
+        input$hpr, 
+        " Health Planning Region"
+      ),
       icon = "fa-users",
       color = "warning"
     )
@@ -594,7 +751,10 @@ renderValueBox({
 renderValueBox({
   if (input$hpr == "All Regions") {
     valueBox(
-      value = percent(covid$SCMS$PercentCasesHospitalized, accuracy = 0.1),
+      value = percent(
+        covid$SCMS$PercentCasesHospitalized, 
+        accuracy = 0.1
+      ),
       caption = "Hospitalization Rate in Virginia",
       icon = "fa-hospital",
       color = "warning"
@@ -602,8 +762,15 @@ renderValueBox({
   }
   else {
     valueBox(
-      value = percent(chosenHPRData()$PercentCasesHospitalized, accuracy = 0.1),
-      caption = paste0("Hospitalization Rate in the ", input$hpr, " Health Planning Region"),
+      value = percent(
+        chosenHPRData()$PercentCasesHospitalized, 
+        accuracy = 0.1
+      ),
+      caption = paste0(
+        "Hospitalization Rate in the ", 
+        input$hpr, 
+        " Health Planning Region"
+      ),
       icon = "fa-hospital",
       color = "warning"
     )
@@ -619,7 +786,10 @@ renderValueBox({
 renderValueBox({
   if (input$hpr == "All Regions") {
     valueBox(
-      value = percent(covid$SCMS$MortalityRate, accuracy = 0.1),
+      value = percent(
+        covid$SCMS$MortalityRate, 
+        accuracy = 0.1
+      ),
       caption = "Mortality Rate in Virginia",
       icon = "fa-ambulance",
       color = "warning"
@@ -627,8 +797,15 @@ renderValueBox({
   }
   else {
     valueBox(
-      value = percent(chosenHPRData()$MortalityRate, accuracy = 0.1),
-      caption = paste0("Mortality rate in the ", input$hpr, " Health Planning Region"),
+      value = percent(
+        chosenHPRData()$MortalityRate, 
+        accuracy = 0.1
+      ),
+      caption = paste0(
+        "Mortality rate in the ", 
+        input$hpr, 
+        " Health Planning Region"
+      ),
       icon = "fa-ambulance",
       color = "warning"
     )
@@ -643,102 +820,157 @@ Row
 ### `r renderUI(HTML("<h5 class='chart-title-text'> Health Planning Region Summary Metrics"))`
 ```{r hc_hpr_summary}
 
-observeEvent(input$hpr, {
-  switch(
-    input$hprSummaryChartType,
-    "Cumulative Totals" = updatePickerInput(
-      session = session,
-      inputId = "hprSummaryMetric",
-      selected = "Total Cases"
-    ),
-    "Daily New Values" = updatePickerInput(
-      session = session,
-      inputId = "hprSummaryMetric",
-      selected = "New Cases"
+# force metric value reset
+# FIRES ON PRIMARY HEALTH PLANNING REGION CHANGE
+observeEvent(
+  input$hpr, {
+    switch(
+      input$hprSummaryChartType,
+      "Cumulative Totals" = updatePickerInput(
+        session = session,
+        inputId = "hprSummaryMetric",
+        selected = "Total Cases"
+      ),
+      "Daily New Values" = updatePickerInput(
+        session = session,
+        inputId = "hprSummaryMetric",
+        selected = "New Cases"
+      )
     )
-  )
-})
+  }
+)
 
 # reactive object for chart data
-hprSummaryChartData <- eventReactive(c(input$hpr, input$hprSummaryMetric, input$hprCompare), {
-  chosenMetric <- switch(
-    input$hprSummaryMetric,
-    "Total Cases" = "TotalCases",
-    "Total Hospitalizations" = "Hospitalizations",
-    "Total Deaths" = "Deaths",
-    "Cases per 100K" = "CasesPer100K",
-    "Hospitalization Rate" = "PercentCasesHospitalized",
-    "Hospitalization per 100K" = "HospitalizationsPer100K",
-    "Mortality Rate" = "MortalityRate",
-    "Deaths per 100K" = "DeathsPer100K",
-    "New Cases" = "NewCases",
-    "New Hospitalizations" = "NewHospitalizations",
-    "New Deaths" = "NewDeaths"
-  )
-
-  chosenAverage <- switch(
-    input$hprSummaryMetric,
-    "New Cases" = "NewCases_7MA",
-    "New Hospitalizations" = "NewHospitalizations_7MA",
-    "New Deaths" = "NewDeaths_7MA"
-  )
-
-  output <- switch(
-    input$hprSummaryChartType,
-    "Cumulative Totals" = if (input$hpr == "All Regions") {
-      covid$HPRMSBD %>%
-      select("plotX" = Date, "plotGroup" = HealthPlanningRegion, "plotY" = all_of(chosenMetric))
-    }
-    else {
-      covid$HPRMSBD %>%
-      filter(HealthPlanningRegion == input$hpr) %>%
-      select("plotX" = Date, "plotY" = all_of(chosenMetric))
-    },
-    "Daily New Values" = if (input$hprCompare == "None") {
-      covid$HPRNMSBD %>%
+# FIRES ON PRIMARY AND SECONDARY HEALTH PLANNING REGION CHANGE AND METRIC VALUE
+# CHANGE
+hprSummaryChartData <- eventReactive(
+  c(input$hpr, input$hprCompare, input$hprSummaryMetric), {
+    chosenMetric <- switch(
+      input$hprSummaryMetric,
+      "Total Cases" = "TotalCases",
+      "Total Hospitalizations" = "Hospitalizations",
+      "Total Deaths" = "Deaths",
+      "Cases per 100K" = "CasesPer100K",
+      "Hospitalization Rate" = "PercentCasesHospitalized",
+      "Hospitalization per 100K" = "HospitalizationsPer100K",
+      "Mortality Rate" = "MortalityRate",
+      "Deaths per 100K" = "DeathsPer100K",
+      "New Cases" = "NewCases",
+      "New Hospitalizations" = "NewHospitalizations",
+      "New Deaths" = "NewDeaths"
+    )
+  
+    chosenAverage <- switch(
+      input$hprSummaryMetric,
+      "New Cases" = "NewCases_7MA",
+      "New Hospitalizations" = "NewHospitalizations_7MA",
+      "New Deaths" = "NewDeaths_7MA"
+    )
+  
+    output <- switch(
+      input$hprSummaryChartType,
+      "Cumulative Totals" = if (input$hpr == "All Regions") {
+        covid$HPRMSBD %>%
+        select(
+          "plotX" = Date, 
+          "plotGroup" = HealthPlanningRegion, 
+          "plotY" = all_of(chosenMetric)
+        )
+      }
+      else {
+        covid$HPRMSBD %>%
         filter(HealthPlanningRegion == input$hpr) %>%
-        select("plotX" = Date, "plotYC" = all_of(chosenMetric), "plotYL" = all_of(chosenAverage))
-    }
-    else {
-      covid$HPRNMSBD %>%
-        filter(HealthPlanningRegion %in% c(input$hpr, input$hprCompare)) %>%
-        select("plotX" = Date, "plotGroup" = HealthPlanningRegion, "plotYC" = all_of(chosenMetric), "plotYL" = all_of(chosenAverage))
-    }
-  )
-})
+        select(
+          "plotX" = Date, 
+          "plotY" = all_of(chosenMetric)
+        )
+      },
+      "Daily New Values" = if (input$hprCompare == "None") {
+        covid$HPRNMSBD %>%
+          filter(HealthPlanningRegion == input$hpr) %>%
+          select(
+            "plotX" = Date, 
+            "plotYC" = all_of(chosenMetric), 
+            "plotYL" = all_of(chosenAverage)
+          )
+      }
+      else {
+        covid$HPRNMSBD %>%
+          filter(HealthPlanningRegion %in% c(input$hpr, input$hprCompare)) %>%
+          select(
+            "plotX" = Date, 
+            "plotGroup" = HealthPlanningRegion, 
+            "plotYC" = all_of(chosenMetric), 
+            "plotYL" = all_of(chosenAverage)
+          )
+      }
+    )
+  }
+)
 
 # reactive object for the y-axis title
-hprSummaryYAxisTitle <- eventReactive(input$hprSummaryMetric, {
-  output <- input$hprSummaryMetric
-})
+# FIREST ON METRIC VALUE CHANGE
+hprSummaryYAxisTitle <- eventReactive(
+  input$hprSummaryMetric, {
+    output <- input$hprSummaryMetric
+  }
+)
 
 # reactive object to plot chart type based on selection
-hprSummaryPlotter <- eventReactive(c(input$hpr, input$hprSummaryMetric, input$hprCompare), {
-  switch(
-    input$hprSummaryChartType,
-    "Cumulative Totals" = if (input$hpr == "All Regions") {
-      HighChartMultiLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
-      StyleMultiLineDate(hprSummaryYAxisTitle, chartSubtitle)
-    }
-    else {
-      HighChartSingleLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
-      StyleSingleLineDate(hprSummaryYAxisTitle, chartSubtitle)
-    },
-    "Daily New Values" = if (input$hprCompare == "None") {
-      HighChartAreaLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
-      StyleAreaLineDate(hprSummaryYAxisTitle, chartSubtitle)
-    }
-    else {
-      HighChartMultiAreaLineDate(hprSummaryChartData, hprSummaryYAxisTitle) %>%
-      StyleMultiAreaLineDate(hprSummaryYAxisTitle, chartSubtitle)
-    }
-  )
-})
+# FIRES ON PRIMARY AND SECONDARY HEALTH PLANNING REGION CHANGE AND METRIC VALUE
+# CHANGE
+hprSummaryPlotter <- eventReactive(
+  c(input$hpr, input$hprCompare, input$hprSummaryMetric), {
+    switch(
+      input$hprSummaryChartType,
+      "Cumulative Totals" = if (input$hpr == "All Regions") {
+        HighChartMultiLineDate(
+          hprSummaryChartData, 
+          hprSummaryYAxisTitle
+        ) %>%
+        StyleMultiLineDate(
+          hprSummaryYAxisTitle, 
+          chartSubtitle
+        )
+      }
+      else {
+        HighChartSingleLineDate(
+          hprSummaryChartData, 
+          hprSummaryYAxisTitle
+        ) %>%
+        StyleSingleLineDate(
+          hprSummaryYAxisTitle, 
+          chartSubtitle
+        )
+      },
+      "Daily New Values" = if (input$hprCompare == "None") {
+        HighChartAreaLineDate(
+          hprSummaryChartData, 
+          hprSummaryYAxisTitle
+        ) %>%
+        StyleAreaLineDate(
+          hprSummaryYAxisTitle, 
+          chartSubtitle
+        )
+      }
+      else {
+        HighChartMultiAreaLineDate(
+          hprSummaryChartData, 
+          hprSummaryYAxisTitle
+        ) %>%
+        StyleMultiAreaLineDate(
+          hprSummaryYAxisTitle, 
+          chartSubtitle
+        )
+      }
+    )
+  }
+)
 
 # render the chart
-renderHighchart({
+renderHighchart(
   hprSummaryPlotter()
-})
+)
 
 ```
 
@@ -764,117 +996,198 @@ panel(
   )
 )
 
+# reactive object to store the name of the chosen locality
+chosenLocality <- reactive(input$mapClick)
 ```
 
 Row {data-height=350}
 -------------------------------------------------------------------------------
 
-### `r renderUI(HTML("<h5 class='chart-title-text'>Totals By Date</h5>"))`
+### `r renderUI(HTML(rv$localityTotalSummaryTitle))`
 ```{r hc_locality_total-summary}
 
+# reactive value to store the total summary chart title
+rv$localityTotalSummaryTitle <- 
+  "<h5 class='chart-title-text'>Totals By Date for Virginia</h5>"
+  
+# change chart title based on the chosen locality
+# FIRES ON MAP CLICK
+observeEvent(
+  input$mapClick, {
+    if (is.null(chosenLocality())) {
+      rv$localityTotalSummaryTitle <- 
+        "<h5 class='chart-title-text'>Totals By Date for Virginia</h5>"
+    }
+    else {
+      rv$localityTotalSummaryTitle <- paste0(
+        "<h5 class='chart-title-text'>Totals By Date for ",
+         chosenLocality(),
+        "</h5>"
+      )
+    }
+  }
+)
+
 # reactive object for chart data
-localitySummaryTotalChartData <- eventReactive(c(input$localitySummaryMetric, input$mapClick), {
-  chosenMetric <- switch(
-    input$localitySummaryMetric,
-    "Total Cases" = "TotalCases",
-    "Total Hospitalizations" = "Hospitalizations",
-    "Total Deaths" = "Deaths",
-    "Cases per 100K" = "CasesPer100K",
-    "Hospitalization Rate" = "PercentCasesHospitalized",
-    "Hospitalization per 100K" = "HospitalizationsPer100K",
-    "Mortality Rate" = "MortalityRate",
-    "Deaths per 100K" = "DeathsPer100K" 
-  )
+# FIRES ON METRIC VALUE CHANGE AND MAP CLICK
+localitySummaryTotalChartData <- eventReactive(
+  c(input$localitySummaryMetric, input$mapClick), {
+    chosenMetric <- switch(
+      input$localitySummaryMetric,
+      "Total Cases" = "TotalCases",
+      "Total Hospitalizations" = "Hospitalizations",
+      "Total Deaths" = "Deaths",
+      "Cases per 100K" = "CasesPer100K",
+      "Hospitalization Rate" = "PercentCasesHospitalized",
+      "Hospitalization per 100K" = "HospitalizationsPer100K",
+      "Mortality Rate" = "MortalityRate",
+      "Deaths per 100K" = "DeathsPer100K" 
+    )
   
-  chosenLocality <- input$mapClick
-  
-  output <- if (is.null(chosenLocality)) {
-    covid$SMSBD %>% 
-      select("plotX" = Date, "plotY" = all_of(chosenMetric))
+    output <- if (is.null(chosenLocality())) {
+      covid$SMSBD %>% 
+        select(
+          "plotX" = Date, 
+          "plotY" = all_of(chosenMetric)
+        )
+    }
+    else {
+      covid$LMSBD %>%
+        filter(Locality == chosenLocality()) %>%
+        select(
+          "plotX" = Date, 
+          "plotY" = all_of(chosenMetric)
+        )
+    }
   }
-  else {
-    covid$LMSBD %>%
-      filter(Locality == chosenLocality) %>%
-      select("plotX" = Date, "plotY" = all_of(chosenMetric))
-  }
-})
+)
 
 # reactive object for the y-axis title
-summaryTotalYAxisTitle <- eventReactive(input$localitySummaryMetric, {
-  output <- input$localitySummaryMetric
-})
-
+# FIRES ON METRIC VALUE CHANGE
+summaryTotalYAxisTitle <- eventReactive(
+  input$localitySummaryMetric, {
+    output <- input$localitySummaryMetric
+  }
+)
 
 # render the chart
-renderHighchart({
-  HighChartSingleLineDate(localitySummaryTotalChartData, summaryTotalYAxisTitle) %>%
-      StyleSingleLineDate(summaryTotalYAxisTitle, chartSubtitle)
-})
+renderHighchart(
+  HighChartSingleLineDate(
+    localitySummaryTotalChartData, 
+    summaryTotalYAxisTitle
+  ) %>%
+    StyleSingleLineDate(
+      summaryTotalYAxisTitle, 
+      chartSubtitle
+    )
+)
 
 ```
 
-### `r renderUI(HTML("<h5 class='chart-title-text'>New By Date</h5>"))`
+### `r renderUI(HTML(rv$localityNewSummaryTitle))`
 ```{r hc_locality_new-summary}
 
+# reactive value to store the new summary chart title
+rv$localityNewSummaryTitle <- 
+  "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
+
+# change chart title based on the chosen locality
+# FIRES ON MAP CLICK
+observeEvent(
+  input$mapClick, {
+    if (is.null(chosenLocality())) {
+      rv$localityNewSummaryTitle <- 
+        "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
+    }
+    else {
+      rv$localityNewSummaryTitle <- paste0(
+        "<h5 class='chart-title-text'>New By Date for ",
+         chosenLocality(),
+        "</h5>"
+      )
+    }
+  }
+)
+
 # reactive object for chart data
-localitySummaryNewChartData <- eventReactive(c(input$localitySummaryMetric, input$mapClick), {
-  chosenMetric <- switch(
-    input$localitySummaryMetric,
-    "Total Cases" = "NewCases",
-    "Total Hospitalizations" = "NewHospitalizations",
-    "Total Deaths" = "NewDeaths",
-    "Cases per 100K" = "NewCases",
-    "Hospitalization Rate" = "NewHospitalizations",
-    "Hospitalization per 100K" = "NewHospitalizations",
-    "Mortality Rate" = "NewDeaths",
-    "Deaths per 100K" = "NewDeaths" 
-  )
+# FIRES ON METRIC VALUE CHANGE AND MAP CLICK
+localitySummaryNewChartData <- eventReactive(
+  c(input$localitySummaryMetric, input$mapClick), {
+    chosenMetric <- switch(
+      input$localitySummaryMetric,
+      "Total Cases" = "NewCases",
+      "Total Hospitalizations" = "NewHospitalizations",
+      "Total Deaths" = "NewDeaths",
+      "Cases per 100K" = "NewCases",
+      "Hospitalization Rate" = "NewHospitalizations",
+      "Hospitalization per 100K" = "NewHospitalizations",
+      "Mortality Rate" = "NewDeaths",
+      "Deaths per 100K" = "NewDeaths" 
+    )
   
-  chosenAverage <- switch(
-    input$localitySummaryMetric,
-    "Total Cases" = "NewCases_7MA",
-    "Total Hospitalizations" = "NewHospitalizations_7MA",
-    "Total Deaths" = "NewDeaths_7MA",
-    "Cases per 100K" = "NewCases_7MA",
-    "Hospitalization Rate" = "NewHospitalizations_7MA",
-    "Hospitalization per 100K" = "NewHospitalizations_7MA",
-    "Mortality Rate" = "NewDeaths_7MA",
-    "Deaths per 100K" = "NewDeaths_7MA"
-  )
+    chosenAverage <- switch(
+      input$localitySummaryMetric,
+      "Total Cases" = "NewCases_7MA",
+      "Total Hospitalizations" = "NewHospitalizations_7MA",
+      "Total Deaths" = "NewDeaths_7MA",
+      "Cases per 100K" = "NewCases_7MA",
+      "Hospitalization Rate" = "NewHospitalizations_7MA",
+      "Hospitalization per 100K" = "NewHospitalizations_7MA",
+      "Mortality Rate" = "NewDeaths_7MA",
+      "Deaths per 100K" = "NewDeaths_7MA"
+    )
   
-  chosenLocality <- input$mapClick
+  #chosenLocality <- input$mapClick
   
-  output <- if (is.null(chosenLocality)) {
-    covid$SNMSBD %>% 
-      select("plotX" = Date, "plotYC" = all_of(chosenMetric), "plotYL" = all_of(chosenAverage))
+    output <- if (is.null(chosenLocality())) {
+      covid$SNMSBD %>% 
+        select(
+          "plotX" = Date, 
+          "plotYC" = all_of(chosenMetric), 
+          "plotYL" = all_of(chosenAverage)
+        )
+    }
+    else {
+      covid$LNMSBD %>%
+        filter(Locality == chosenLocality()) %>%
+        select(
+          "plotX" = Date, 
+          "plotYC" = all_of(chosenMetric), 
+          "plotYL" = all_of(chosenAverage)
+        )
+    }
   }
-  else {
-    covid$LNMSBD %>%
-      filter(Locality == chosenLocality) %>%
-      select("plotX" = Date, "plotYC" = all_of(chosenMetric), "plotYL" = all_of(chosenAverage))
-  }
-})
+)
 
 # reactive object for the y-axis title
-summaryNewYAxisTitle <- eventReactive(input$localitySummaryMetric, {
-  output <- switch(
-    input$localitySummaryMetric,
-    "Total Cases" = "New Cases",
-    "Total Hospitalizations" = "New Hospitalizations",
-    "Total Deaths" = "New Deaths",
-    "Cases per 100K" = "New Cases",
-    "Hospitalization Rate" = "New Hospitalizations",
-    "Hospitalization per 100K" = "New Hospitalizations",
-    "Mortality Rate" = "New Deaths",
-    "Deaths per 100K" = "New Deaths"
-  )
-})
+# FIRES ON METRIC VALUE CHANGE
+summaryNewYAxisTitle <- eventReactive(
+  input$localitySummaryMetric, {
+    output <- switch(
+      input$localitySummaryMetric,
+      "Total Cases" = "New Cases",
+      "Total Hospitalizations" = "New Hospitalizations",
+      "Total Deaths" = "New Deaths",
+      "Cases per 100K" = "New Cases",
+      "Hospitalization Rate" = "New Hospitalizations",
+      "Hospitalization per 100K" = "New Hospitalizations",
+      "Mortality Rate" = "New Deaths",
+      "Deaths per 100K" = "New Deaths"
+    )
+  }
+)
 
 # render the chart
-renderHighchart({
-  HighChartAreaLineDate(localitySummaryNewChartData, summaryNewYAxisTitle) %>%
-      StyleAreaLineDate(summaryNewYAxisTitle, chartSubtitle)
-})
+renderHighchart(
+  HighChartAreaLineDate(
+    localitySummaryNewChartData, 
+    summaryNewYAxisTitle
+  ) %>%
+    StyleAreaLineDate(
+      summaryNewYAxisTitle, 
+      chartSubtitle
+    )
+)
 
 ```
 
@@ -882,37 +1195,149 @@ Row
 -------------------------------------------------------------------------------
 
 ### `r renderUI(HTML("<h5 class='chart-title-text'>Locality Map - Current Metrics</h5>"))`
-```{r hm_locality_summary}
+```{r hm_locality_summary, fig.width=15}
 
 # reactive object for chart data
-localitySummaryMapData <- eventReactive(input$localitySummaryMetric, {
-  chosenMetric <- switch(
-    input$localitySummaryMetric,
-    "Total Cases" = "TotalCases",
-    "Total Hospitalizations" = "Hospitalizations",
-    "Total Deaths" = "Deaths",
-    "Cases per 100K" = "CasesPer100K",
-    "Hospitalization Rate" = "PercentCasesHospitalized",
-    "Hospitalization per 100K" = "HospitalizationsPer100K",
-    "Mortality Rate" = "MortalityRate",
-    "Deaths per 100K" = "DeathsPer100K",
-    "New Cases" = "NewCases",
-    "New Hospitalizations" = "NewHospitalizations",
-    "New Deaths" = "NewDeaths" 
-  )
+# FIRES ON METRIC VALUE CHANGE
+localitySummaryMapData <- eventReactive(
+  input$localitySummaryMetric, {
+    chosenMetric <- switch(
+      input$localitySummaryMetric,
+      "Total Cases" = "TotalCases",
+      "Total Hospitalizations" = "Hospitalizations",
+      "Total Deaths" = "Deaths",
+      "Cases per 100K" = "CasesPer100K",
+      "Hospitalization Rate" = "PercentCasesHospitalized",
+      "Hospitalization per 100K" = "HospitalizationsPer100K",
+      "Mortality Rate" = "MortalityRate",
+      "Deaths per 100K" = "DeathsPer100K",
+      "New Cases" = "NewCases",
+      "New Hospitalizations" = "NewHospitalizations",
+      "New Deaths" = "NewDeaths" 
+    )
   
-  output <- covid$LCMS %>%
-      select(fips, Locality, "plotValue" = all_of(chosenMetric))
-})
+    output <- covid$LCMS %>%
+      select(
+        fips, 
+        Locality, 
+        "plotValue" = all_of(chosenMetric)
+      )
+  }
+)
 
-# reactive object for the y-axis title
-summaryMapTitle <- eventReactive(input$localitySummaryMetric, {
-  output <- input$localitySummaryMetric
-})
+# reactive object for the map title
+# FIRES ON METRIC VALUE CHANGE
+summaryMapTitle <- eventReactive(
+  input$localitySummaryMetric, {
+    output <- input$localitySummaryMetric
+  }
+)
 
 # render the chart
-renderHighchart({
-  HighChartVAChloroplethMap(localitySummaryMapData, "plotValue", summaryMapTitle)
-})
+renderHighchart(
+  HighChartVAChloroplethMap(
+    localitySummaryMapData, 
+    "plotValue", 
+    summaryMapTitle
+  )
+)
+
+```
+
+### `r renderUI(HTML(rv$localityQuickSummaryTitle))`
+```{r hm_locality_quick_summary}
+
+# reactive value to store the quick summary chart title
+rv$localityQuickSummaryTitle <- 
+  "<h5 class='chart-title-text'>Quick Summary</h5>"
+
+# change chart title based on the chosen locality
+# FIRES ON MAP CLICK
+observeEvent(
+  input$mapClick, {
+    if (is.null(chosenLocality())) {
+      rv$localityQuickSummaryTitle <- 
+        "<h5 class='chart-title-text'>Quick Summary</h5>"
+    }
+    else {
+      rv$localityQuickSummaryTitle <- paste0(
+        "<h5 class='chart-title-text'>Quick Summary for ",
+         chosenLocality(),
+        "</h5>"
+      )
+    }
+  }
+)
+
+# reactive object for quick summary data
+# FIRES ON METRIC VALUE CHANGE
+quickSummaryData <- eventReactive(
+  input$mapClick, {
+    totals <- covid$LCMS %>%
+      filter(Locality == chosenLocality()) %>%
+      select(
+        Locality,
+        "Population" = Population2019,
+        "Total Cases" = TotalCases,
+        "Total Hospitalizations" = Hospitalizations,
+        "Total Deaths" = Deaths,
+        "Cases per 100K" = CasesPer100K,
+        "Hospitalization Rate" = PercentCasesHospitalized,
+        "Hospitalizations per 100K" = HospitalizationsPer100K,
+        "Mortality Rate" = MortalityRate,
+        "Deaths per 100K" = DeathsPer100K
+      ) %>%
+      mutate(
+        across(
+          .cols = contains("Rate"),
+          .fns = ~ percent(.x, accuracy = 0.1)
+        ),
+        across(
+          .cols = where(is.numeric),
+          .fns = ~ round(.x, digits = 2)
+        ),
+        across(
+          .cols = where(is.numeric),
+          .fns = ~ format(.x, big.mark = ",")
+        )
+      ) %>%
+      pivot_longer(
+        cols = c(2:10),
+        names_to = "Metrics",
+        values_to = "Value"
+      )
+  
+    new <- covid$LCNMS %>%
+      filter(Locality == chosenLocality()) %>%
+      select(
+        Locality,
+        "New Cases" = NewCases,
+        "New Hospitalizations" = NewHospitalizations,
+        "New Deaths" = NewDeaths
+      ) %>%
+      pivot_longer(
+        cols = c(2:4),
+        names_to = "Metrics",
+        values_to = "Value"
+      ) %>%
+      mutate(
+        across(
+          .cols = where(is.numeric),
+          .fns = ~ format(.x, big.mark = ",")
+        )
+      )
+  
+    output <- bind_rows(
+      totals, 
+      new
+    )
+  }
+)
+
+renderTable(
+  quickSummaryData()[, 2:3],
+  spacing = "xs",
+  align = c("lr")
+)
 
 ```

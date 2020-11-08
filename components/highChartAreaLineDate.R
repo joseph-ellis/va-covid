@@ -80,7 +80,7 @@ StyleAreaLineDate <- function(.hc, .yTitle, .subtitle) {
       style = list(
         color = "#21445F"
       ),
-      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+      text = paste0("COVID-19 ", .yTitle())
     ) %>%
     hc_subtitle(
       align = "left",
