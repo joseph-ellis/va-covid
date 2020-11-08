@@ -25,7 +25,7 @@ HighChartMultiAreaLineDate <- function(.data, .yTitle) {
 }
 
 JS_tooltipFormatter <- V8::JS(
-  "function() {
+  "function () {
       return this.points.reduce(function(s, point) {
         if(point.y % 1 == 0) {
           return s + '<span style=\"color:' + point.color + '\">●</span>' +
@@ -87,8 +87,6 @@ StyleMultiAreaLineDate <- function(.hc, .yTitle, .subtitle) {
     ) %>%
     hc_tooltip(
       useHTML = TRUE,
-      #headerFormat = "{point.x:%B %d, %Y} <br />",
-      #pointFormat = "<strong>{series.name}:</strong>  {point.y}<br />",
       formatter = JS_tooltipFormatter,
       shared = TRUE
     ) %>%
@@ -97,7 +95,7 @@ StyleMultiAreaLineDate <- function(.hc, .yTitle, .subtitle) {
       style = list(
         color = "#21445F"
       ),
-      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+      text = paste0("COVID-19 ", .yTitle())
     ) %>%
     hc_subtitle(
       align = "left",

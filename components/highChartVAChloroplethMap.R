@@ -21,22 +21,6 @@ JS_clickEvent <- V8::JS(
   }"
 )
 
-JS_pointSelect <- V8::JS(
-  "function () {
-    const text = 'You selected ' + this.name + ' (' + this.value)',
-    chart = this.series.chart;
-    if (!chart.selectedLabel) {
-      chart.selectedLabel = chart.renderer.label(text, 0, 320)
-      .add();
-    }
-    else {
-      chart.selectedLabel.attr({
-        text: text
-      });
-    }
-  }"
-)
-
 HighChartVAChloroplethMap <- function(.data, .value, .name) {
   hcmap(
     map = "countries/us/us-va-all",
@@ -46,7 +30,6 @@ HighChartVAChloroplethMap <- function(.data, .value, .name) {
     name = .name()
   ) %>%
     hc_colorAxis(
-      #stops = ViridisStops(10, .option = "B")
       stops = BrewerStops(8, "RdYlGn", .reverse = TRUE)
     ) %>%
     hc_plotOptions(
@@ -54,13 +37,6 @@ HighChartVAChloroplethMap <- function(.data, .value, .name) {
         point = list(
           events = list(
             click = JS_clickEvent
-          )
-        ),
-        states = list(
-          select = list(
-            borderColor = "#FFFFFF",
-            borderWidth = 2,
-            color = "#04BF9D"
           )
         )
       )
@@ -71,4 +47,3 @@ HighChartVAChloroplethMap <- function(.data, .value, .name) {
       pointFormatter = JS_tooltipPointFormatter
     )
 }
-

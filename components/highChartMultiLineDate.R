@@ -18,7 +18,7 @@ StyleMultiLineDate <- function(.hc, .yTitle, .subtitle) {
 
   # callback function for formatting y-axis labels
   JS_yAxisFormatter <- V8::JS(
-    "function() {
+    "function () {
       if(this.value < 1 && this.value > 0) {
         return Highcharts.numberFormat((this.value * 100), 0) + '%';
       }
@@ -29,7 +29,7 @@ StyleMultiLineDate <- function(.hc, .yTitle, .subtitle) {
   )
 
   JS_tooltipFormatter <- V8::JS(
-    "function() {
+    "function () {
       return this.points.reduce(function(s, point) {
         var value = point.y;
 
@@ -92,7 +92,7 @@ StyleMultiLineDate <- function(.hc, .yTitle, .subtitle) {
       style = list(
         color = "#21445F"
       ),
-      text = paste0("COVID-19 ", .yTitle(), " in Virginia")
+      text = paste0("COVID-19 ", .yTitle())
     ) %>%
     hc_subtitle(
       align = "left",
