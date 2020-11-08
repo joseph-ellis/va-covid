@@ -996,7 +996,10 @@ panel(
   )
 )
 
+<<<<<<< HEAD
 # reactive object to store the name of the chosen locality
+=======
+>>>>>>> 8bad918c98ff7c0808e79652b37a8dec1561871f
 chosenLocality <- reactive(input$mapClick)
 ```
 
@@ -1006,6 +1009,7 @@ Row {data-height=350}
 ### `r renderUI(HTML(rv$localityTotalSummaryTitle))`
 ```{r hc_locality_total-summary}
 
+<<<<<<< HEAD
 # reactive value to store the total summary chart title
 rv$localityTotalSummaryTitle <- 
   "<h5 class='chart-title-text'>Totals By Date for Virginia</h5>"
@@ -1059,16 +1063,61 @@ localitySummaryTotalChartData <- eventReactive(
           "plotY" = all_of(chosenMetric)
         )
     }
+=======
+rv$localityTotalSummaryTitle <- "<h5 class='chart-title-text'>Totals By Date for Virginia</h5>"
+  
+observeEvent(input$mapClick, {
+  if (is.null(chosenLocality())) {
+    rv$localityTotalSummaryTitle <- "<h5 class='chart-title-text'>Totals By Date for Virginia</h5>"
+  }
+  else {
+    rv$localityTotalSummaryTitle <- paste0(
+      "<h5 class='chart-title-text'>Totals By Date for ",
+       chosenLocality(),
+      "</h5>"
+    )
+  }
+})
+
+# reactive object for chart data
+localitySummaryTotalChartData <- eventReactive(c(input$localitySummaryMetric, input$mapClick), {
+  chosenMetric <- switch(
+    input$localitySummaryMetric,
+    "Total Cases" = "TotalCases",
+    "Total Hospitalizations" = "Hospitalizations",
+    "Total Deaths" = "Deaths",
+    "Cases per 100K" = "CasesPer100K",
+    "Hospitalization Rate" = "PercentCasesHospitalized",
+    "Hospitalization per 100K" = "HospitalizationsPer100K",
+    "Mortality Rate" = "MortalityRate",
+    "Deaths per 100K" = "DeathsPer100K" 
+  )
+  
+  output <- if (is.null(chosenLocality())) {
+    covid$SMSBD %>% 
+      select("plotX" = Date, "plotY" = all_of(chosenMetric))
+  }
+  else {
+    covid$LMSBD %>%
+      filter(Locality == chosenLocality()) %>%
+      select("plotX" = Date, "plotY" = all_of(chosenMetric))
+>>>>>>> 8bad918c98ff7c0808e79652b37a8dec1561871f
   }
 )
 
 # reactive object for the y-axis title
+<<<<<<< HEAD
 # FIRES ON METRIC VALUE CHANGE
 summaryTotalYAxisTitle <- eventReactive(
   input$localitySummaryMetric, {
     output <- input$localitySummaryMetric
   }
 )
+=======
+summaryTotalYAxisTitle <- eventReactive(input$localitySummaryMetric, {
+  output <- input$localitySummaryMetric
+})
+>>>>>>> 8bad918c98ff7c0808e79652b37a8dec1561871f
 
 # render the chart
 renderHighchart(
@@ -1086,6 +1135,20 @@ renderHighchart(
 
 ### `r renderUI(HTML(rv$localityNewSummaryTitle))`
 ```{r hc_locality_new-summary}
+rv$localityNewSummaryTitle <- "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
+  
+observeEvent(input$mapClick, {
+  if (is.null(chosenLocality())) {
+    rv$localityNewSummaryTitle <- "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
+  }
+  else {
+    rv$localityNewSummaryTitle <- paste0(
+      "<h5 class='chart-title-text'>New By Date for ",
+       chosenLocality(),
+      "</h5>"
+    )
+  }
+})
 
 # reactive value to store the new summary chart title
 rv$localityNewSummaryTitle <- 
@@ -1333,6 +1396,77 @@ quickSummaryData <- eventReactive(
     )
   }
 )
+
+renderTable(
+  quickSummaryData()[, 2:3],
+  spacing = "xs",
+  align = c("lr")
+)
+
+```
+
+### `r renderUI(HTML("<h5 class='chart-title-text'>Quick Summary</h5>"))`
+```{r hm_locality_quick_summary}
+
+quickSummaryData <- eventReactive(input$mapClick, {
+  chosenLocality <- input$mapClick
+  
+  totals <- covid$LCMS %>%
+    filter(Locality == chosenLocality) %>%
+    select(
+      Locality,
+      "Population" = Population2019,
+      "Total Cases" = TotalCases,
+      "Total Hospitalizations" = Hospitalizations,
+      "Total Deaths" = Deaths,
+      "Cases per 100K" = CasesPer100K,
+      "Hospitalization Rate" = PercentCasesHospitalized,
+      "Hospitalizations per 100K" = HospitalizationsPer100K,
+      "Mortality Rate" = MortalityRate,
+      "Deaths per 100K" = DeathsPer100K
+    ) %>%
+    mutate(
+      across(
+        .cols = contains("Rate"),
+        .fns = ~ percent(.x, accuracy = 0.1)
+      ),
+      across(
+        .cols = where(is.numeric),
+        .fns = ~ round(.x, digits = 2)
+      ),
+      across(
+        .cols = where(is.numeric),
+        .fns = ~ format(.x, big.mark = ",")
+      )
+    ) %>%
+    pivot_longer(
+      cols = c(2:10),
+      names_to = "Metrics",
+      values_to = "Value"
+    )
+  
+  new <- covid$LCNMS %>%
+    filter(Locality == chosenLocality) %>%
+    select(
+      Locality,
+      "New Cases" = NewCases,
+      "New Hospitalizations" = NewHospitalizations,
+      "New Deaths" = NewDeaths
+    ) %>%
+    pivot_longer(
+      cols = c(2:4),
+      names_to = "Metrics",
+      values_to = "Value"
+    ) %>%
+    mutate(
+      across(
+        .cols = where(is.numeric),
+        .fns = ~ format(.x, big.mark = ",")
+      )
+    )
+  
+  output <- bind_rows(totals, new)
+})
 
 renderTable(
   quickSummaryData()[, 2:3],
