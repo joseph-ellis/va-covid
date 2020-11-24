@@ -1,5 +1,6 @@
 library(RSocrata)
 library(tidyverse)
+library(config)
 
 # load Virginia map data
 load("data/VaMapData.RData")
@@ -11,6 +12,11 @@ vaPop2019 <- read_csv(
     fips = col_character(),
     Population2019 = col_number()
   )
+)
+
+# load Virginia population data by age
+vaPopAge2019 <- read_csv(
+  file = "data/va-pop-age-2019.csv"
 )
 
 # make a request to the VDOH Socrata Open Data API
@@ -42,7 +48,7 @@ api_urls <- list(
 )
 
 # load API credentials
-creds <- config::get(value = "covidApp")
+creds <- get(value = "covidApp")
 
 # get data from VDOH Socrata Open Data API
 vdoh_data <- api_urls %>%

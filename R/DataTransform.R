@@ -162,6 +162,79 @@ stateCurrentNewMetricSummary <- stateNewMetricSummaryByDate %>%
   filter(Date == max(Date)) %>%
   select(Date, NewCases, NewHospitalizations, NewDeaths)
 
+#summary of
+stateAgeGroupMetricSummaryByDate <- vdoh_data$CasesByAgeGroupDistrict %>%
+  mutate(
+    across(
+      .cols = c("number_of_cases", "number_of_hospitalizations",
+                "number_of_deaths"),
+      .fns = as.numeric
+    )
+  ) %>%
+  rename(
+    "Date" = report_date,
+    "AgeGroup" = age_group
+  ) %>%
+  left_join(vaPopAge2019) %>%
+  group_by(Date, AgeGroup, Population2019) %>%
+  summarize(
+    TotalCases = sum(number_of_cases),
+    Hospitalizations = sum(number_of_hospitalizations),
+    Deaths = sum(number_of_deaths)
+  ) %>%
+  mutate(
+    across(
+      .cols = where(is.numeric),
+      .fns = ~ replace(
+        .x,
+        is.na(.x),
+        0
+      )
+    )
+  ) %>%
+  mutate(
+    CasesPerCapita = TotalCases / Population2019,
+    CasesPer100K = CasesPerCapita * 1e5,
+    PercentCasesHospitalized = Hospitalizations / TotalCases,
+    HospitalizationPerCapita = Hospitalizations / Population2019,
+    HospitalizationsPer100K = HospitalizationPerCapita * 1e5,
+    MortalityRate = Deaths / TotalCases,
+    DeathsPerCapita = Deaths / Population2019,
+    DeathsPer100K = DeathsPerCapita * 1e5,
+    across(
+      .cols = where(is.numeric),
+      .fns = ~ round(
+        .x,
+        digits = 4
+      )
+    )
+  ) %>%
+  ungroup()
+
+stateAgeGroupNewMetricSummaryByDate <- stateAgeGroupMetricSummaryByDate %>%
+  select(Date, AgeGroup, TotalCases, Hospitalizations, Deaths) %>%
+  group_by(AgeGroup) %>%
+  mutate(
+    NewCases = TotalCases - lag(TotalCases, default = 0),
+    NewHospitalizations = Hospitalizations - lag(Hospitalizations, default = 0),
+    NewDeaths = Deaths - lag(Deaths, default = 0)
+  ) %>%
+  select(Date, AgeGroup, NewCases, NewHospitalizations, NewDeaths) %>%
+  group_by(AgeGroup) %>%
+  mutate(
+    NewCases_7MA = MovingAverage7Day(NewCases),
+    NewHospitalizations_7MA = MovingAverage7Day(NewHospitalizations),
+    NewDeaths_7MA = MovingAverage7Day(NewDeaths)
+  ) %>%
+  ungroup()
+
+stateAgeGroupCurrentMetricSummaryByDate <- stateAgeGroupMetricSummaryByDate %>%
+  filter(Date == max(Date))
+
+stateAgeGroupCurrentNewMetricSummary <- stateAgeGroupNewMetricSummaryByDate %>%
+  filter(Date == max(Date)) %>%
+  select(Date, AgeGroup, NewCases, NewHospitalizations, NewDeaths)
+
 ################################################
 ## HEALTH PLANNING REGION METRIC CALCULATIONS ##
 ################################################
@@ -196,7 +269,7 @@ healthPlanningRegionNewMetricSummaryByDate <- healthPlanningRegionMetricSummaryB
 
 healthPlanningRegionCurrentNewMetricSummary <- healthPlanningRegionNewMetricSummaryByDate %>%
   filter(Date == max(Date)) %>%
-  select(Date, NewCases, NewHospitalizations, NewDeaths)
+  select(Date, HealthPlanningRegion, NewCases, NewHospitalizations, NewDeaths)
 
 #########################################
 ## HEALTH DISTRICT METRIC CALCULATIONS ##
@@ -216,8 +289,6 @@ healthDistrictCurrentMetricSummary <- localMetricSummaryByDate %>%
 localityCurrentMetricSummary <- localMetricSummaryByDate %>%
   filter(Date == max(Date))
 
-
-
 # objects to save
 toSave <- list(
   LCMS = localCurrentMetricSummary,
@@ -228,6 +299,10 @@ toSave <- list(
   SMSBD = stateMetricSummaryByDate,
   SCNMS = stateCurrentNewMetricSummary,
   SNMSBD = stateNewMetricSummaryByDate,
+  SAGMSBD = stateAgeGroupMetricSummaryByDate,
+  SAGCMSBD = stateAgeGroupCurrentMetricSummaryByDate,
+  SAGNMSBD = stateAgeGroupNewMetricSummaryByDate,
+  SAGCNMS = stateAgeGroupCurrentNewMetricSummary,
   HPRCMS = healthPlanningRegionCurrentMetricSummary,
   HPRMSBD = healthPlanningRegionMetricSummaryByDate,
   HPRCNMS = healthPlanningRegionCurrentNewMetricSummary,
