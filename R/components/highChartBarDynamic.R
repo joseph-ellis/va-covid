@@ -1,8 +1,8 @@
 
 HighChartBarDynamic <- function(.data, .yTitle) {
   hchart(
-    name = .yTitle(),
-    .data(),
+    object = .data,
+    name = .yTitle,
     type = "column",
     hcaes(
       x = plotX,
@@ -40,16 +40,6 @@ StyleBarDynamic <- function(.hc) {
         Highcharts.numberFormat(this.y, 0) + '</span>';
       }
     }"
-  )
-
-  # callback function for statically positioning the tooltip
-  JS_tooltipPositioner <- V8::JS(
-    "function (labelWidth) {
-      return {
-        x: 50,
-        y: 50
-      };
-  }"
   )
 
   .hc %>%

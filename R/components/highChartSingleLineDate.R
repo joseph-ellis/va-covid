@@ -3,8 +3,8 @@
 HighChartSingleLineDate <- function(.data, .yTitle) {
   highchart() %>%
     hc_add_series(
-      name = .yTitle(),
-      data = .data(),
+      name = .yTitle,
+      data = .data,
       type = "line",
       hcaes(
         x = as.Date(plotX),
@@ -57,7 +57,7 @@ StyleSingleLineDate <- function(.hc, .yTitle, .subtitle) {
     hc_yAxis(
       title = list(
         useHTML = TRUE,
-        text = as.character(h6(.yTitle()))
+        text = as.character(h6(.yTitle))
       ),
       labels = list(
         formatter = JS_yAxisFormatter
@@ -89,7 +89,7 @@ StyleSingleLineDate <- function(.hc, .yTitle, .subtitle) {
       style = list(
         color = "#21445F"
       ),
-      text = paste0("COVID-19 ", .yTitle())
+      text = paste0("COVID-19 ", .yTitle)
     ) %>%
     hc_subtitle(
       align = "left",

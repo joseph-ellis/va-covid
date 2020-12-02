@@ -3,8 +3,8 @@
 HighChartAreaLineDate <- function(.data, .yTitle) {
   highchart() %>%
     hc_add_series(
-      name = .yTitle(),
-      data = .data(),
+      name = .yTitle,
+      data = .data,
       type = "area",
       hcaes(
         x = as.Date(plotX),
@@ -13,7 +13,7 @@ HighChartAreaLineDate <- function(.data, .yTitle) {
     ) %>%
     hc_add_series(
       name = "7-Day Moving Average",
-      data = .data(),
+      data = .data,
       type = "line",
       hcaes(
         x = as.Date(plotX),
@@ -40,7 +40,7 @@ StyleAreaLineDate <- function(.hc, .yTitle, .subtitle) {
     hc_yAxis(
       title = list(
         useHTML = TRUE,
-        text = as.character(h6(.yTitle()))
+        text = as.character(h6(.yTitle))
       ),
       labels = list(
         format = "{value:,.0f}"
@@ -80,7 +80,7 @@ StyleAreaLineDate <- function(.hc, .yTitle, .subtitle) {
       style = list(
         color = "#21445F"
       ),
-      text = paste0("COVID-19 ", .yTitle())
+      text = paste0("COVID-19 ", .yTitle)
     ) %>%
     hc_subtitle(
       align = "left",

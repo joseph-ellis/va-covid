@@ -1,0 +1,795 @@
+---
+title: "COVID-19 in Virginia"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    social: menu
+    source_code: https://github.com/joseph-ellis/va-covid
+    theme: paper
+runtime: shiny
+---
+
+<!-- TODO - Move any style written here to its own CSS file -->
+<style>
+  .chart-title {
+    color: #FFFFFF;
+    background-color: #2196F3;
+    border-color: #2196F3;
+    border-radius: 2px 2px 0px 0px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  .chart-title-text {
+    color: #FFFFFF;
+  }
+  
+  .chart-wrapper {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3)
+  }
+
+  .panel {
+    margin-top: 10px;
+  }
+  
+  .panel-heading {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  .panel-title {
+    font-size: 18px;
+  }
+
+  ul {
+    list-style-type: none;
+  }
+  
+  .value-box {
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3)
+  }
+</style>
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, 
+  message = FALSE, 
+  warning = FALSE
+)
+ # load necessary packages
+library(flexdashboard)
+library(highcharter)
+library(kableExtra)
+library(lubridate)
+library(scales)
+library(shiny)
+library(shinyjs)
+library(shinythemes)
+library(shinyWidgets)
+library(tidyverse)
+
+# load globals
+source("R/global.R")
+
+# load functions
+source("R/functions/ReadableDate.R")
+source("R/functions/ColorStops.R")
+
+# get a list of all component files
+componentSource <- list.files(
+  path = "R/components",
+  pattern = ".R",
+  full.names = TRUE
+)
+
+# source all function files
+sapply(
+  X = componentSource,
+  FUN = source
+)
+
+# load all data
+covid <- readRDS("data/covid_refactor.rds")
+
+# initialize reactive values object
+rv <- reactiveValues()
+```
+
+```{r globals}
+# metrics showing counted values
+metricsCount <- c(
+  "Total Cases",
+  "Total Hospitalizations",
+  "Total Deaths"
+)
+
+# metrics showing rates
+metricsRate <- c(
+  "Cases per 100K",
+  "Hospitalization Rate",
+  "Hospitalization per 100K",
+  "Mortality Rate",
+  "Deaths per 100K"
+)
+
+# metrics showing daily new values
+metricsNew <- c(
+  "New Cases",
+  "New Hospitalizations",
+  "New Deaths"
+)
+
+# date of last data update
+dataDate <- covid$SCNMS$dailyNew$Date %>%
+  ReadableDate()
+
+# common subtitle for charts
+chartSubtitle <- paste0(
+  "Data reported by the Virginia Department of Health as of ", 
+  dataDate
+)
+
+# enable use of shinyjs
+useShinyjs(rmd = TRUE)
+```
+
+State Metric Summary {data-navmenu="State"}
+================================================================================
+Inputs {.sidebar}
+--------------------------------------------------------------------------------
+```{r sidebar_state-summary}
+# user input panel
+panel(
+  heading = "User Inputs",
+  status = "primary",
+  prettyRadioButtons(
+    inputId = "stateSummaryChartType",
+    label = "What to plot...", 
+    choices = c(
+      "Cumulative Totals",
+      "Daily New Values"
+    ),
+    icon = icon("check"), 
+    bigger = TRUE,
+    status = "primary"
+  ),
+  pickerInput(
+    inputId = "stateSummaryMetric",
+    label = "Choose a metric for the chart...", 
+    choices = list(
+      Counts = metricsCount,
+      Rates = metricsRate
+    ),
+    selected = "Total Cases"
+  )
+)
+
+# change metrics in the dropdown menu based on selected chart type
+# FIRES ON stateSummaryChartType CHANGE
+observeEvent(
+  label = "stateSummaryChartTypeSelection",
+  input$stateSummaryChartType, {
+    metricChoices <- switch(
+      input$stateSummaryChartType,
+      "Cumulative Totals" = list(
+        Counts = metricsCount,
+        Rates = metricsRate
+      ),
+      "Daily New Values" = metricsNew
+    )
+    
+    updatePickerInput(
+      session = session,
+      inputId = "stateSummaryMetric",
+      choices = metricChoices
+    )
+  }
+)
+```
+
+Row
+--------------------------------------------------------------------------------
+### Total Cases
+```{r value-box_state_total-cases}
+# display cases value card
+renderValueBox({
+  if (input$stateSummaryChartType == "Cumulative Totals") {
+    valueBox(
+      value = format(
+        covid$SCMS$TotalCases, 
+        big.mark = ","
+      ),
+      caption = "Total Cases in Virginia",
+      icon = "fa-thermometer-three-quarters",
+      color = "danger"
+    )
+  }
+  else {
+    valueBox(
+      value = format(
+        covid$SCNMS$dailyNew$NewCases, 
+        big.mark = ","
+      ),
+      caption = "New Cases in Virginia",
+      icon = "fa-thermometer-three-quarters",
+      color = "danger"
+    )
+  }
+})
+```
+
+### Hospitalizations
+```{r value-box_state_hospitalizations}
+# display hospitalizations value card
+renderValueBox({
+  if (input$stateSummaryChartType == "Cumulative Totals") {
+    valueBox(
+      value = format(
+        covid$SCMS$Hospitalizations, 
+        big.mark = ","
+      ),
+      caption = "Total Hospitalizations in Virginia",
+      icon = "fa-hospital",
+      color = "danger"
+    )
+  }
+  else {
+    valueBox(
+      value = format(
+        covid$SCNMS$dailyNew$NewHospitalizations, 
+        big.mark = ","
+      ),
+      caption = "New Hospitalizations in Virginia",
+      icon = "fa-hospital",
+      color = "danger"
+    )
+  }
+})
+```
+
+### Deaths
+```{r value-box_state_deaths}
+# display deaths value card
+renderValueBox({
+  if (input$stateSummaryChartType == "Cumulative Totals") {
+    valueBox(
+      value = format(
+        covid$SCMS$Deaths, 
+        big.mark = ","
+      ),
+      caption = "Total Deaths in Virginia",
+      icon = "fa-ambulance",
+      color = "danger"
+    )
+  }
+  else {
+    valueBox(
+      value = format(
+        covid$SCNMS$dailyNew$NewDeaths, 
+        big.mark = ","
+      ),
+      caption = "New Deaths in Virginia",
+      icon = "fa-ambulance",
+      color = "danger"
+    )
+  }
+})
+```
+
+Row
+--------------------------------------------------------------------------------
+### Cases per 100K
+```{r value-box_state_cases-100k}
+# display cases per 100K or new cases moving average
+renderValueBox({
+  if (input$stateSummaryChartType == "Cumulative Totals") {
+    valueBox(
+      value = format(
+        round(covid$SCMS$CasesPer100K),
+        big.mark = ","
+      ),
+      caption = "Cases per 100K People in Virginia",
+      icon = "fa-users",
+      color = "warning"
+    )
+  }
+  else {
+    valueBox(
+      value = format(
+        round(covid$SCNMS$movingAverage$NewCases_7MA), 
+        big.mark = ","
+      ),
+      caption = "Cases 7-Day Moving Average",
+      icon = "fa-users",
+      color = "warning"
+    )
+  }
+})
+```
+
+### Hospitalizations Rate
+```{r value-box_state_hospital_rate}
+# display hospitalization rate or new hospitalizations moving average
+renderValueBox({
+  if (input$stateSummaryChartType == "Cumulative Totals") {
+    valueBox(
+      value = percent(
+        covid$SCMS$PercentCasesHospitalized,
+        accuracy = 0.1
+      ),
+      caption = "Hospitalization Rate in Virginia",
+      icon = "fa-hospital",
+      color = "warning"
+    )
+  }
+  else {
+    valueBox(
+      value = format(
+        round(covid$SCNMS$movingAverage$NewHospitalizations_7MA), 
+        big.mark = ","
+      ),
+      caption = "Hospitalizations 7-Day Moving Average",
+      icon = "fa-hospital",
+      color = "warning"
+    )
+  }
+})
+```
+
+### Mortality Rate
+```{r value-box_state_mortality_rate}
+# display mortality rate or new deaths moving average
+renderValueBox({
+  if (input$stateSummaryChartType == "Cumulative Totals") {
+    valueBox(
+        value = percent(
+          covid$SCMS$MortalityRate,
+          accuracy = 0.1
+        ),
+        caption = "Mortality Rate in Virginia",
+        icon = "fa-ambulance",
+        color = "warning"
+      )
+  }
+  else {
+    valueBox(
+      value = format(
+        round(covid$SCNMS$movingAverage$NewDeaths_7MA), 
+        big.mark = ","
+      ),
+      caption = "Deaths 7-Day Moving Average",
+      icon = "fa-ambulance",
+      color = "warning"
+    )
+  }
+})
+```
+
+Row
+--------------------------------------------------------------------------------
+### `r renderUI(HTML("<h5 class='chart-title-text'>State Summary Metrics</h5>"))`
+```{r hc_state_summary}
+
+# reactive object to build the chart
+# FIRES ON stateSummaryMetric CHANGE
+stateSummaryChartObject <- eventReactive(
+  label = "stateSummaryChartObject",
+  input$stateSummaryMetric, {
+    chosenMetric <- switch(
+      input$stateSummaryMetric,
+      "Total Cases" = "TotalCases",
+      "Total Hospitalizations" = "Hospitalizations",
+      "Total Deaths" = "Deaths",
+      "Cases per 100K" = "CasesPer100K",
+      "Hospitalization Rate" = "PercentCasesHospitalized",
+      "Hospitalization per 100K" = "HospitalizationsPer100K",
+      "Mortality Rate" = "MortalityRate",
+      "Deaths per 100K" = "DeathsPer100K",
+      "New Cases" = "NewCases",
+      "New Hospitalizations" = "NewHospitalizations",
+      "New Deaths" = "NewDeaths" 
+    )
+    
+    chosenAverage <- switch(
+      input$stateSummaryMetric,
+      "New Cases" = "NewCases_7MA",
+      "New Hospitalizations" = "NewHospitalizations_7MA",
+      "New Deaths" = "NewDeaths_7MA" 
+    )
+    
+    chartData <- switch(
+      input$stateSummaryChartType,
+      "Cumulative Totals" = covid$SMSBD %>% 
+        select(
+          "plotX" = Date, 
+          "plotY" = all_of(chosenMetric)
+        ),
+      "Daily New Values" = covid$SNMSBD %>% 
+        select(
+          "plotX" = Date, 
+          "plotYC" = all_of(chosenMetric), 
+          "plotYL" = all_of(chosenAverage)
+        )
+    )
+    
+    chartYAxisTitle <- input$stateSummaryMetric
+    
+    output <- switch(
+      input$stateSummaryChartType,
+      "Cumulative Totals" = HighChartSingleLineDate(
+        chartData, 
+        chartYAxisTitle
+      ) %>%
+        StyleSingleLineDate(
+          chartYAxisTitle, 
+          chartSubtitle
+        ),
+      "Daily New Values" = HighChartAreaLineDate(
+        chartData, 
+        chartYAxisTitle
+      ) %>%
+        StyleAreaLineDate(
+          chartYAxisTitle, 
+          chartSubtitle
+        )
+    )
+  }
+)
+
+# render the chart
+renderHighchart({
+  stateSummaryChartObject()
+})
+```
+
+State Age Groups {data-navmenu="State"}
+================================================================================
+Inputs {.sidebar}
+--------------------------------------------------------------------------------
+```{r sidebar_state-age-groups}
+# list of age groups for dropdown
+ageGroups <- covid$SAGMSBD %>%
+  distinct(AgeGroup) %>%
+  filter(AgeGroup != "Missing")
+
+# user input panel
+panel(
+  heading = "User Inputs",
+  status = "primary",
+  prettyRadioButtons(
+    inputId = "stateAgeGroupChartType",
+    label = "What to plot...", 
+    choices = c(
+      "Cumulative Totals",
+      "Daily New Values"
+    ),
+    icon = icon("check"), 
+    bigger = TRUE,
+    status = "primary"
+  ),
+  pickerInput(
+    inputId = "stateAgeGroupSummaryMetric",
+    label = "Choose a metric for the chart...", 
+    choices = list(
+      Counts = metricsCount,
+      Rates = metricsRate
+    ),
+    selected = "Total Cases"
+  ),
+  hidden(
+    pickerInput(
+      inputId = "ageGroups",
+      label = "Choose an age group...", 
+      choices = ageGroups
+    )
+  )
+)
+
+# reactive value to track show/hide for the age group dropdown menu
+rv$ageGroupSelect <- 0
+
+# change metrics in the dropdown menu based on selected chart type
+# FIRES ON stateAgeGroupChartType CHANGE
+observeEvent(
+  label = "stateAgeGroupChartTypeSelection",
+  input$stateAgeGroupChartType, {
+    metricChoices <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = list(
+        Counts = metricsCount,
+        Rates = metricsRate
+      ),
+      "Daily New Values" = metricsNew
+    )
+    
+    updatePickerInput(
+      session = session,
+      inputId = "stateAgeGroupSummaryMetric",
+      choices = metricChoices
+    )
+    
+    if (input$stateAgeGroupChartType == "Cumulative Totals") {
+      rv$ageGroupSelect <- 0
+    }
+    else {
+      rv$ageGroupSelect <- 1
+    }
+  }
+)
+
+# show/hide the age group dropdown menu
+# FIRES ON ageGroupSelect CHANGE
+observeEvent(
+  label = "showHideAgeGroups",
+  rv$ageGroupSelect, {
+    if (rv$ageGroupSelect == 0) {
+      hide(selector = "select[id='ageGroups']")
+    }
+    else {
+      show(selector = "select[id='ageGroups']")
+    }
+})
+```
+
+Row {data-height=300}
+--------------------------------------------------------------------------------
+### `r renderUI(HTML(rv$stateAgeGroupCases))`
+``` {r hc_state-age-group-total-cases}
+# reactive value to dynamically change the chart title
+rv$stateAgeGroupCases <-
+  "<h5 class='chart-title-text'>Total Cases by Age Group</h5>"
+
+# change the chart title based on the selected chart type
+# FIRES ON stateAgeGroupChartType CHANGE
+observeEvent(
+  label = "stateAgeGroupCasesChartTitle",
+  input$stateAgeGroupChartType, {
+    switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = 
+        rv$stateAgeGroupCases <-
+          "<h5 class='chart-title-text'>Total Cases by Age Group</h5>",
+      "Daily New Values" = 
+        rv$stateAgeGroupCases <-
+          "<h5 class='chart-title-text'>New Cases by Age Group</h5>"
+    )
+  }
+)
+
+# reactive object to build the chart
+# FIRES ON stateAgeGroupChartType CHANGE
+casesAgeGroupChartObject <- eventReactive(
+  label = "casesAgeGroupChartObject",
+  input$stateAgeGroupChartType, {
+    chartData <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = covid$SAGCMS %>%
+        select(
+          "plotX" = AgeGroup,
+          "plotY" = TotalCases
+        ),
+      "Daily New Values" = covid$SAGCNMS$dailyNew %>%
+        select(
+          "plotX" = AgeGroup,
+          "plotY" = NewCases
+        )
+    )
+    
+    chartYAxisTitle <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = "Total Cases",
+      "Daily New Values" = "New Cases"
+    )
+      
+    output <- HighChartBarDynamic(
+      .data = chartData,
+      .yTitle = chartYAxisTitle
+    ) %>%
+      StyleBarDynamic()
+  }
+)
+
+# render the chart
+renderHighchart({
+  casesAgeGroupChartObject()
+})
+```
+
+### `r renderUI(HTML(rv$stateAgeGroupHospitalizations))`
+``` {r hc_state-age-group-total-hospitalizations}
+# reactive value to dynamically change the chart title
+rv$stateAgeGroupHospitalizations <- 
+  "<h5 class='chart-title-text'>Total Hospitalizations by Age Group</h5>"
+
+# change the chart title based on the selected chart type
+# FIRES ON stateAgeGroupChartType CHANGE
+observeEvent(
+  label = "stateAgeGroupHospitalizationsChartTitle",
+  input$stateAgeGroupChartType, {
+    switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = 
+        rv$stateAgeGroupHospitalizations <- 
+          "<h5 class='chart-title-text'>Total Hospitalizations by Age Group</h5>",
+      "Daily New Values" = 
+        rv$stateAgeGroupHospitalizations <- 
+          "<h5 class='chart-title-text'>New Hospitalizations by Age Group</h5>"
+    )
+  }
+)
+
+# reactive object to build the chart
+# FIRES ON stateAgeGroupChartType CHANGE
+hospitalizationsAgeGroupChartObject <- eventReactive(
+  label = "hospitalizationsAgeGroupChartObject",
+  input$stateAgeGroupChartType, {
+    chartData <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = covid$SAGCMS %>%
+        select(
+          "plotX" = AgeGroup,
+          "plotY" = Hospitalizations
+        ),
+      "Daily New Values" = covid$SAGCNMS$dailyNew %>%
+        select(
+          "plotX" = AgeGroup,
+          "plotY" = NewHospitalizations
+        )
+    )
+    
+    chartYAxisTitle <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = "Total Hospitalizations",
+      "Daily New Values" = "New Hospitalizations"
+    )
+    
+    output <- HighChartBarDynamic(
+      .data = chartData,
+      .yTitle = chartYAxisTitle
+    ) %>%
+      StyleBarDynamic()
+  }
+)
+
+# render the chart
+renderHighchart({
+  hospitalizationsAgeGroupChartObject()
+})
+
+```
+
+### `r renderUI(HTML(rv$stateAgeGroupDeaths))`
+``` {r hc_state-age-group-total-deaths}
+# reactive value to dynamically change the chart title
+rv$stateAgeGroupDeaths <- "<h5 class='chart-title-text'>Total Deaths by Age Group</h5>"
+
+# change the chart title based on the selected chart type
+# FIRES ON stateAgeGroupChartType CHANGE
+observeEvent(
+  label = "stateAgeGroupDeathsChartTitle",
+  input$stateAgeGroupChartType, {
+    switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" =
+        rv$stateAgeGroupDeaths <- "<h5 class='chart-title-text'>Total Deaths by Age Group</h5>",
+      "Daily New Values" =
+        rv$stateAgeGroupDeaths <- "<h5 class='chart-title-text'>New Deaths by Age Group</h5>"
+    )
+  }
+)
+
+# reactive object to build the chart
+# FIRES ON stateAgeGroupChartType CHANGE
+deathsAgeGroupChartObject <- eventReactive(
+  label = "deathsAgeGroupChartObject",
+  input$stateAgeGroupChartType, {
+    chartData <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = covid$SAGCMS %>%
+        select(
+          "plotX" = AgeGroup,
+          "plotY" = Deaths
+        ),
+      "Daily New Values" = covid$SAGCNMS$dailyNew %>%
+        select(
+          "plotX" = AgeGroup,
+          "plotY" = NewDeaths
+        )
+    )
+    
+    chartYAxisTitle <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = "Total Deaths",
+      "Daily New Values" = "New Deaths"
+    )
+    
+    output <- output <- HighChartBarDynamic(
+      .data = chartData,
+      .yTitle = chartYAxisTitle
+    ) %>%
+      StyleBarDynamic()
+  }
+)
+
+# render the chart
+renderHighchart({
+  deathsAgeGroupChartObject()
+})
+```
+
+Row
+--------------------------------------------------------------------------------
+### `r renderUI(HTML("<h5 class='chart-title-text'>State Age Group Summary Metrics</h5>"))`
+```{r}
+
+# reactive object to build the chart
+# FIRES ON stateAgeGroupMetric, stateAgeGroupChartType, and ageGroups CHANGE
+stateAgeGroupSummaryChartObject <- eventReactive(
+  label = "stateAgeGroupSummaryChartObject",
+  c(input$stateAgeGroupSummaryMetric, input$stateAgeGroupChartType, input$ageGroups), {
+    chosenMetric <- switch(
+      input$stateAgeGroupSummaryMetric,
+      "Total Cases" = "TotalCases",
+      "Total Hospitalizations" = "Hospitalizations",
+      "Total Deaths" = "Deaths",
+      "Cases per 100K" = "CasesPer100K",
+      "Hospitalization Rate" = "PercentCasesHospitalized",
+      "Hospitalization per 100K" = "HospitalizationsPer100K",
+      "Mortality Rate" = "MortalityRate",
+      "Deaths per 100K" = "DeathsPer100K",
+      "New Cases" = "NewCases",
+      "New Hospitalizations" = "NewHospitalizations",
+      "New Deaths" = "NewDeaths" 
+    )
+    
+    chosenAverage <- switch(
+      input$stateAgeGroupSummaryMetric,
+      "New Cases" = "NewCases_7MA",
+      "New Hospitalizations" = "NewHospitalizations_7MA",
+      "New Deaths" = "NewDeaths_7MA" 
+    )
+    
+    chartData <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = covid$SAGMSBD %>% 
+        select(
+          "plotX" = Date,
+          "plotY" = all_of(chosenMetric),
+          "plotGroup" = AgeGroup
+        ),
+      "Daily New Values" = covid$SAGNMSBD %>%
+        filter(AgeGroup == input$ageGroups) %>%
+        select(
+          "plotX" = Date, 
+          "plotYC" = all_of(chosenMetric), 
+          "plotYL" = all_of(chosenAverage)
+        )
+    )
+    
+    chartYAxisTitle <- input$stateAgeGroupSummaryMetric
+    
+    output <- switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = HighChartMultiLineDate(
+        chartData, 
+        chartYAxisTitle
+      ) %>%
+        StyleMultiLineDate(
+          chartYAxisTitle, 
+          chartSubtitle
+        ),
+      "Daily New Values" = HighChartAreaLineDate(
+        chartData, 
+        chartYAxisTitle
+      ) %>%
+        StyleAreaLineDate(
+          chartYAxisTitle, 
+          chartSubtitle
+        )
+    )
+  }
+)
+
+renderHighchart({
+  stateAgeGroupSummaryChartObject()
+})
+```
