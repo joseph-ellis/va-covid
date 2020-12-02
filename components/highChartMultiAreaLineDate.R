@@ -24,8 +24,11 @@ HighChartMultiAreaLineDate <- function(.data, .yTitle) {
     )
 }
 
-JS_tooltipFormatter <- V8::JS(
-  "function () {
+# application specific styling
+StyleMultiAreaLineDate <- function(.hc, .yTitle, .subtitle) {
+
+  JS_tooltipFormatter <- V8::JS(
+    "function () {
       return this.points.reduce(function(s, point) {
         if(point.y % 1 == 0) {
           return s + '<span style=\"color:' + point.color + '\">●</span>' +
@@ -37,10 +40,7 @@ JS_tooltipFormatter <- V8::JS(
         }
       }, Highcharts.dateFormat('%B %d, %Y', this.x) + '<br />');
     }"
-)
-
-# application specific styling
-StyleMultiAreaLineDate <- function(.hc, .yTitle, .subtitle) {
+  )
 
   # styling
   .hc %>%

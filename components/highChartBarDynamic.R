@@ -1,21 +1,17 @@
 
-HighChartRadialBarStatic <- function(.data, .yTitle) {
+HighChartBarDynamic <- function(.data, .yTitle) {
   hchart(
-    name = .yTitle,
-    .data,
+    name = .yTitle(),
+    .data(),
     type = "column",
     hcaes(
       x = plotX,
       y = plotY
     )
-  ) %>%
-    hc_chart(
-      inverted = TRUE,
-      polar = TRUE
-    )
+  )
 }
 
-StyleRadialBarStatic <- function(.hc) {
+StyleBarDynamic <- function(.hc) {
   # callback function for formatting y-axis labels
   JS_yAxisFormatter <- V8::JS(
     "function () {
@@ -49,27 +45,19 @@ StyleRadialBarStatic <- function(.hc) {
   # callback function for statically positioning the tooltip
   JS_tooltipPositioner <- V8::JS(
     "function (labelWidth) {
-    return {
-      x: 50,
-      y: 50
-    };
+      return {
+        x: 50,
+        y: 50
+      };
   }"
   )
 
   .hc %>%
-    hc_pane(
-      endAngle = 270,
-      innerSize = "20%",
-      size = "95%"
-    ) %>%
     hc_xAxis(
       tickInterval = 1,
       labels = list(
-        align = "right",
-        useHTML = TRUE,
-        allowOverlap = TRUE,
-        step = 1,
-        y = 3
+        align = "center",
+        useHTML = TRUE
       ),
       title = list(
         enabled = FALSE
@@ -96,23 +84,6 @@ StyleRadialBarStatic <- function(.hc) {
       useHTML = TRUE,
       backgroundColor = "#FFF",
       shape = "square",
-      formatter = JS_tooltipFormatter,
-      positioner = JS_tooltipPositioner
+      formatter = JS_tooltipFormatter
     )
-    # hc_title(
-    #   align = "left",
-    #   style = list(
-    #     color = "#21445F"
-    #   ),
-    #   text = paste0("COVID-19 ", .yTitle())
-    # ) %>%
-    # hc_subtitle(
-    #   align = "left",
-    #   style = list(
-    #     color = "#21445F"
-    #   ),
-    #   text = .subtitle
-    # )
 }
-
-

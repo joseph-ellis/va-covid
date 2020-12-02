@@ -70,14 +70,22 @@ library(tidyverse)
 # load globals
 source("R/global.R")
 
-# load necessary components
-source("components/highChartSingleLineDate.R")
-source("components/highChartMultiLineDate.R")
-source("components/highChartAreaLineDate.R")
-source("components/highChartMultiAreaLineDate.R")
-source("components/highChartVAChloroplethMap.R")
-source("components/highChartRadialBarStatic.R")
-source("components/highChartRadialBarDynamic.R")
+# load functions
+source("R/functions/ReadableDate.R")
+source("R/functions/ColorStops.R")
+
+# get a list of all component files
+componentSource <- list.files(
+  path = "./components",
+  pattern = ".R",
+  full.names = TRUE
+)
+
+# source all function files
+sapply(
+  X = componentSource,
+  FUN = source
+)
 
 # load all data
 covid <- readRDS("data/covid.rds")
@@ -384,6 +392,13 @@ Sidebar {.sidebar}
 --------------------------------------------------------------------------------
 ```{r sidebar_state-age-groups}
 
+# list of health planning regions for dropdown
+ageGroups <- covid$SAGMSBD %>%
+  distinct(AgeGroup) %>%
+  filter(AgeGroup != "Missing")
+
+rv$ageGroupSelect <- 0
+
 # user input panel
 panel(
   heading = "User Inputs",
@@ -407,6 +422,13 @@ panel(
       Rates = metricsRate
     ),
     selected = "Total Cases"
+  ),
+  hidden(
+    pickerInput(
+      inputId = "ageGroups",
+      label = "Choose an age group...", 
+      choices = ageGroups
+    )
   )
 )
 
@@ -429,8 +451,25 @@ observeEvent(
       inputId = "stateAgeGroupMetric",
       choices = metricChoices
     )
+    
+    if (input$stateAgeGroupChartType == "Cumulative Totals") {
+      rv$ageGroupSelect <- 0
+    }
+    else {
+      rv$ageGroupSelect <- 1
+    }
   }
 )
+
+observeEvent(
+  rv$ageGroupSelect, {
+    if (rv$ageGroupSelect == 0) {
+      hide(selector = "select[id='ageGroups']")
+    }
+    else {
+      show(selector = "select[id='ageGroups']")
+    }
+})
 
 ```
 
@@ -483,11 +522,11 @@ stateAgeGroupCasesYAxisTitle <- eventReactive(
 )
 
 renderHighchart(
-  HighChartRadialBarDynamic(
+  HighChartBarDynamic(
     .data = casesAgeGroup,
     .yTitle = stateAgeGroupCasesYAxisTitle
   ) %>%
-    StyleRadialBarDynamic()
+    StyleBarDynamic()
 )
 
 ```
@@ -539,17 +578,30 @@ stateAgeGroupHospitalizationsYAxisTitle <- eventReactive(
 )
 
 renderHighchart(
-  HighChartRadialBarDynamic(
+  HighChartBarDynamic(
     .data = hospitalizationsAgeGroup,
     .yTitle = stateAgeGroupHospitalizationsYAxisTitle
   ) %>%
-    StyleRadialBarDynamic()
+    StyleBarDynamic()
 )
 
 ```
 
-### `r renderUI(HTML("<h5 class='chart-title-text'>Total Deaths by Age Group</h5>"))`
+### `r renderUI(HTML(rv$stateAgeGroupDeaths))`
 ``` {r hc_state-age-group-total-deaths}
+rv$stateAgeGroupDeaths <- "<h5 class='chart-title-text'>Total Deaths by Age Group</h5>"
+
+observeEvent(
+  input$stateAgeGroupChartType, {
+    switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = 
+        rv$stateAgeGroupDeaths <- "<h5 class='chart-title-text'>Total Deaths by Age Group</h5>",
+      "Daily New Values" = 
+        rv$stateAgeGroupDeaths <- "<h5 class='chart-title-text'>New Deaths by Age Group</h5>"
+    )
+  }
+)
 
 deathsAgeGroup <- eventReactive(
   input$stateAgeGroupChartType, {
@@ -582,11 +634,11 @@ stateAgeGroupDeathsYAxisTitle <- eventReactive(
 )
 
 renderHighchart(
-  HighChartRadialBarDynamic(
+  HighChartBarDynamic(
     .data = deathsAgeGroup,
     .yTitle = stateAgeGroupDeathsYAxisTitle
   ) %>%
-    StyleRadialBarDynamic()
+    StyleBarDynamic()
 )
 
 ```
@@ -597,7 +649,7 @@ Row
 ### Chart
 ```{r}
 stateAgeGroupChartData <- eventReactive(
-  c(input$stateAgeGroupMetric, input$stateAgeGroupChartType), {
+  c(input$stateAgeGroupMetric, input$stateAgeGroupChartType, input$ageGroups), {
     chosenMetric <- switch(
       input$stateAgeGroupMetric,
       "Total Cases" = "TotalCases",
@@ -613,12 +665,12 @@ stateAgeGroupChartData <- eventReactive(
       "New Deaths" = "NewDeaths"
     )
   
-    # chosenAverage <- switch(
-    #   input$hprSummaryMetric,
-    #   "New Cases" = "NewCases_7MA",
-    #   "New Hospitalizations" = "NewHospitalizations_7MA",
-    #   "New Deaths" = "NewDeaths_7MA"
-    # )
+    chosenAverage <- switch(
+      input$stateAgeGroupMetric,
+      "New Cases" = "NewCases_7MA",
+      "New Hospitalizations" = "NewHospitalizations_7MA",
+      "New Deaths" = "NewDeaths_7MA"
+    )
   
     output <- switch(
       input$stateAgeGroupChartType,
@@ -629,7 +681,13 @@ stateAgeGroupChartData <- eventReactive(
           "plotY" = all_of(chosenMetric),
           "plotGroup" = AgeGroup
         ),
-      "Daily New Values" = NULL
+      "Daily New Values" = covid$SAGNMSBD %>%
+        filter(AgeGroup == input$ageGroups) %>%
+        select(
+          "plotX" = Date, 
+          "plotYC" = all_of(chosenMetric), 
+          "plotYL" = all_of(chosenAverage)
+        )
     )
   }
 )
@@ -642,15 +700,32 @@ stateAgeGroupYAxisTitle <- eventReactive(
   }
 )
 
-renderHighchart({
-  HighChartMultiLineDate(
-    .data = stateAgeGroupChartData,
-    .yTitle = stateAgeGroupYAxisTitle
-  ) %>%
-    StyleMultiLineDate(
-      .yTitle = stateAgeGroupYAxisTitle,
-      .subtitle = chartSubtitle
+stateAgeGroupSummaryPlotter <- eventReactive(
+  c(input$stateAgeGroupMetric, input$ageGroups), {
+    switch(
+      input$stateAgeGroupChartType,
+      "Cumulative Totals" = HighChartMultiLineDate(
+        stateAgeGroupChartData, 
+        stateAgeGroupYAxisTitle
+      ) %>%
+        StyleMultiLineDate(
+          stateAgeGroupYAxisTitle, 
+          chartSubtitle
+        ),
+      "Daily New Values" = HighChartAreaLineDate(
+        stateAgeGroupChartData, 
+        stateAgeGroupYAxisTitle
+      ) %>%
+        StyleAreaLineDate(
+          stateAgeGroupYAxisTitle, 
+          chartSubtitle
+        )
     )
+  }
+)
+
+renderHighchart({
+  stateAgeGroupSummaryPlotter()
 })
 
 
@@ -1273,14 +1348,26 @@ panel(
       Rates = metricsRate
     ),
     selected = "Total Cases"
+  ),
+  actionBttn(
+    inputId = "mapReset",
+    label = "Reset the Page",
+    style = "material-flat",
+    color = "primary"
   )
-  # actionBttn(
-  #   inputId = "mapReset",
-  #   label = "Reset the Page",
-  #   style = "material-flat",
-  #   color = "primary"
-  # )
 )
+
+tags$script("
+    Shiny.addCustomMessageHandler('reset', function(input) {
+      Shiny.onInputChange(input, null);
+    });"
+)
+
+observeEvent(input$mapReset, {
+    session$sendCustomMessage(type = "reset", message = "mapClick")
+  })
+
+
 
 # reactive object to store the name of the chosen locality
 chosenLocality <- reactive(input$mapClick)
@@ -1297,9 +1384,9 @@ rv$localityTotalSummaryTitle <-
   "<h5 class='chart-title-text'>Totals By Date for Virginia</h5>"
   
 # change chart title based on the chosen locality
-# FIRES ON MAP CLICK
+# FIRES ON MAP CLICK AND MAP RESET
 observeEvent(
-  input$mapClick, {
+  c(input$mapClick, input$mapReset), {
     if (is.null(chosenLocality())) {
       rv$localityTotalSummaryTitle <- 
         "<h5 class='chart-title-text'>Totals By Date for Virginia</h5>"
@@ -1380,18 +1467,19 @@ renderHighchart(
 ```{r hc_locality_new-summary}
 rv$localityNewSummaryTitle <- "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
   
-observeEvent(input$mapClick, {
-  if (is.null(chosenLocality())) {
-    rv$localityNewSummaryTitle <- "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
-  }
-  else {
-    rv$localityNewSummaryTitle <- paste0(
-      "<h5 class='chart-title-text'>New By Date for ",
-       chosenLocality(),
-      "</h5>"
-    )
-  }
-})
+# observeEvent(
+#   c(input$mapClick, input$mapReset), {
+#   if (is.null(chosenLocality())) {
+#     rv$localityNewSummaryTitle <- "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
+#   }
+#   else {
+#     rv$localityNewSummaryTitle <- paste0(
+#       "<h5 class='chart-title-text'>New By Date for ",
+#        chosenLocality(),
+#       "</h5>"
+#     )
+#   }
+# })
 
 # reactive value to store the new summary chart title
 rv$localityNewSummaryTitle <- 
@@ -1400,7 +1488,7 @@ rv$localityNewSummaryTitle <-
 # change chart title based on the chosen locality
 # FIRES ON MAP CLICK
 observeEvent(
-  input$mapClick, {
+  c(input$mapClick, input$mapReset), {
     if (is.null(chosenLocality())) {
       rv$localityNewSummaryTitle <- 
         "<h5 class='chart-title-text'>New By Date for Virginia</h5>"
@@ -1557,7 +1645,7 @@ rv$localityQuickSummaryTitle <-
   "<h5 class='chart-title-text'>Quick Summary for Virginia</h5>"
   
 observeEvent(
-  input$mapClick, {
+  c(input$mapClick, input$mapReset), {
     if (is.null(chosenLocality())) {
       rv$localityQuickSummaryTitle <- 
         "<h5 class='chart-title-text'>Quick Summary for Virginia</h5>"

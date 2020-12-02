@@ -19,7 +19,7 @@ vaPopAge2019 <- read_csv(
   file = "data/va-pop-age-2019.csv"
 )
 
-# make a request to the VDOH Socrata Open Data API
+# FUNCTION - make a request to the VDH Socrata Open Data API
 VdohApiRequest <- function(.url, .credentials) {
   read.socrata(
     url = .url,
@@ -29,7 +29,7 @@ VdohApiRequest <- function(.url, .credentials) {
   )
 }
 
-# VDOH Socrata Open Data API endpoints
+# VDH Socrata Open Data API endpoints
 api_urls <- list(
   CasesLocality = "https://data.virginia.gov/resource/bre9-aqqr.json",
   CasesByConfirmationState = "https://data.virginia.gov/resource/uqs3-x7zh.json",
@@ -48,9 +48,13 @@ api_urls <- list(
 )
 
 # load API credentials
+# In order to call the Virginia Department of Health Open Data API, you must
+# register your application and generate a token. This application uses a
+# config.yml file at the project root to store the app token, registered email
+# address, and password necessary to access the API.
 creds <- get(value = "covidApp")
 
-# get data from VDOH Socrata Open Data API
+# get data from VDH Socrata Open Data API
 vdoh_data <- api_urls %>%
   map(
     .f = VdohApiRequest,

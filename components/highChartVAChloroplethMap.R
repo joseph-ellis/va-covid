@@ -1,7 +1,8 @@
 
-# callback function for formatting tooltip values
-JS_tooltipPointFormatter <- V8::JS(
-  "function () {
+HighChartVAChloroplethMap <- function(.data, .value, .name) {
+  # callback function for formatting tooltip values
+  JS_tooltipPointFormatter <- V8::JS(
+    "function () {
       if(this.value < 1 && this.value > 0) {
         return '<strong>' + this.name + ':  </strong>' +
           Highcharts.numberFormat((this.value * 100), 2) + '%';
@@ -11,17 +12,17 @@ JS_tooltipPointFormatter <- V8::JS(
           Highcharts.numberFormat(this.value, 0);
       }
     }"
-)
+  )
 
-JS_clickEvent <- V8::JS(
-  "function () {
+  # shiny event listener for map click
+  JS_clickEvent <- V8::JS(
+    "function () {
     Shiny.onInputChange('mapClick', {
       locality: this.name
     })
   }"
-)
+  )
 
-HighChartVAChloroplethMap <- function(.data, .value, .name) {
   hcmap(
     map = "countries/us/us-va-all",
     data = .data(),

@@ -61,6 +61,11 @@ localMetricSummaryByDate <- vdoh_data$CasesLocality %>%
         0
       )
     )
+  ) %>%
+  distinct(
+    Date,
+    fips,
+    .keep_all = TRUE
   )
 
 # operations for summary objects
